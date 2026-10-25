@@ -9,10 +9,10 @@
 - [ ] Opening the **Flight Deck** (`/`) displays all **Interview Rounds** scheduled within the next 48 hours pinned at the top, showing the **Company**, **Opportunity**, round type/time, linked interviewer **Contacts**, linked **Stories**, and a one-click link into the round's preparation view.
 - [ ] The **Flight Deck** surfaces any past/completed **Interview Round** that does not yet have a recorded **Debrief**, prompting the candidate to log their reflection while fresh.
 - [ ] The **Flight Deck** lists open **Action Items** ordered by due date (highlighting overdue and due-today items) and allows completing or snoozing them inline.
-- [ ] The **Flight Deck** deterministically flags `Active` **Opportunities** that exceed stage-based staleness thresholds:
-  - `Discovered` > 3 days with no outreach or application activity
-  - `Outreach` > 4 days since last **Interaction** or transition
-  - `Applied` > 10 days with no activity
-  - `Screening` or `Interviewing` > 5 days after the latest completed **Interview Round** with no upcoming **Interview Round** scheduled
-- [ ] From any staleness nudge on the **Flight Deck**, the candidate can immediately log an **Interaction** (which resets the staleness timer), advance the **Stage**, or update the **Outcome** (e.g., mark `Ghosted` or `Archived`/`Withdrawn`).
-- [ ] Backend HTTP handler tests (using an injected deterministic `Clock`) and frontend **Flight Deck** tests verify all four staleness rules, 48-hour upcoming interview pinning, missing **Debrief** alerts, and inline resolution actions.
+- [ ] The **Flight Deck** uses the pure domain evaluator (`domain.EvaluateFlightDeck`) with an injected `Clock` to deterministically flag `Active` **Opportunities** that exceed stage-based staleness thresholds:
+  - `Discovered` > 3 days measured from `max(LatestStageTransitionAt, LastActivityAt)`
+  - `Outreach` > 4 days measured from `max(LatestStageTransitionAt, LatestInteractionAt)`
+  - `Applied` > 10 days measured from `max(LatestStageTransitionAt, LastActivityAt)`
+  - `Screening` or `Interviewing` > 5 days after the latest completed **Interview Round** (`ScheduledAt`) with no upcoming **Interview Round** scheduled
+- [ ] From any staleness nudge on the **Flight Deck**, the candidate can immediately log an **Interaction** (which advances `LastActivityAt` and resets the staleness timer), advance the **Stage**, or update the **Outcome** (e.g., mark `Ghosted` or `Withdrawn`).
+- [ ] Pure `internal/domain` unit tests (`EvaluateFlightDeck`), backend HTTP handler tests (using an injected deterministic `Clock`), and frontend **Flight Deck** tests verify all four staleness rules, 48-hour upcoming interview pinning, missing **Debrief** alerts, and inline resolution actions.

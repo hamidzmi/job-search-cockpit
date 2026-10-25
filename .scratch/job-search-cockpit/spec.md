@@ -84,45 +84,66 @@ Build the **Job Search Cockpit**: a local-first, single-user web application (Go
 
 ## Implementation Decisions
 
-### Architectural Shape & Packaging
+### Architectural Shape, Clean Architecture Layers & Packaging
 - **Single-user local-first runtime (ADR-0001)**: The application consists of a Go HTTP backend (`net/http`) and a React + TypeScript single-page frontend (Vite, Tailwind CSS, TanStack Query, React Router). During development, Vite proxies `/api/*` requests to the Go backend. For production/local binary usage, the Go server can serve the compiled frontend static assets via `embed.FS`.
-- **Local storage layout**: All mutable state lives under a configurable local data directory (defaulting to `./data/`, gitignored): a single SQLite database file (`cockpit.db`) using the pure-Go `modernc.org/sqlite` driver (with WAL mode and foreign keys enabled) and an `artifacts/` directory for uploaded binary files (such as external PDF resumes).
+- **Concentric Clean Architecture on the Go Backend (ADR-0003)**:
+  - **`internal/domain`**: Pure Go entities, value objects, typed domain errors (`ErrNotFound`, `ErrValidation`, `ErrInvalidTransition`, `ErrConflict`, `ErrAssistantUnavailable`), and pure domain services (`EvaluateFlightDeck`, `ComputeFunnelAnalytics`, `DetectRepeatedStories`). Zero external dependencies, SQL imports, or HTTP/JSON tags.
+  - **`internal/usecase`**: Application use cases / interactors and outbound port interfaces (`Repositories`, `TxManager`, `Clock`, `AssistantGateway`, `JobPageParser`, `ArtifactBlobStore`, `BackupPort`). Orchestrates atomic multi-repository workflows via `TxManager.WithinTransaction(ctx, fn)` without importing `database/sql` or `os`.
+  - **`internal/adapter/http`**: Inbound REST `http.Handler` controllers, explicit request/response DTO structs, input validation, and a centralized domain-error-to-HTTP status/JSON envelope mapper (`{ "error": { "code": "...", "message": "...", "details": ... } }`).
+  - **`internal/adapter/sqlite`**: Outbound SQLite repository implementations, embedded SQL migrations, `VACUUM INTO` / JSON backup support, and context-propagated transaction management (`TxManager`).
+  - **`internal/adapter/ai` & `internal/adapter/scraper` & `internal/adapter/fs`**: Outbound infrastructure adapters for OpenRouter/LLM prompt construction and structured JSON parsing (`AssistantGateway`), ATS/JSON-LD HTML parsing (`JobPageParser`), and local PDF blob storage (`ArtifactBlobStore`).
+- **Modular Feature-Based Frontend Architecture**: The React frontend is organized into feature modules (`src/features/<module>/`) with a decoupled typed API gateway and TanStack Query boundary so UI components never make raw `fetch` calls directly.
+- **Local storage layout**: All mutable state lives under a configurable local data directory (defaulting to `./data/`, gitignored): a single SQLite database file (`cockpit.db`) using the pure-Go `modernc.org/sqlite` driver (with WAL mode and foreign keys enabled) and an `artifacts/` directory managed via `ArtifactBlobStore` for uploaded binary files (such as external PDF resumes).
 - **Automatic schema migrations**: Embedded SQL migrations run automatically on Go server startup to keep the SQLite schema up to date.
 
-### Core Domain Modules & Schema Invariants
+### Focused Domain Aggregates, Services & Invariants
+- **Focused Aggregate Boundaries (ADR-0003)**:
+  - Rather than a monolithic God object, `Opportunity` is a focused Aggregate Root owning its core pursuit fields, embedded `JobPosting` value object, `Stage`, `Outcome`, `LastActivityAt`, and `UpdatedAt`.
+  - `InterviewRound` (with its 1:1 `Debrief`), `FitAssessment`, `ApplicationArtifact`, and `Offer` are separate aggregates referencing `OpportunityID`.
+  - `Company`, `Contact`, `Interaction`, `ActionItem`, `CandidateProfile`, and `Story` are independent aggregates in the single context.
 - **Companies & Opportunities**:
-  - `companies` stores name, domain/website, headquarters/remote policy, size/stage, notes, and timestamps.
-  - `opportunities` references `company_id`, holds role title, seniority, location/remote policy, priority, `stage` (`Discovered`, `Outreach`, `Applied`, `Screening`, `Interviewing`, `Offer`), `outcome` (`Active`, `On Hold`, `Won`, `Declined`, `Rejected`, `Withdrawn`, `Ghosted`), last activity timestamp, and embedded/linked **Job Posting** fields (source URL, raw text, parsed requirements, tech stack tags, stated min/max compensation, currency).
+  - `Company` stores name, domain/website, headquarters/remote policy, size/stage, notes, and timestamps.
+  - `Opportunity` references `CompanyID`, holds role title, seniority, location/remote policy, priority, `Stage` (`Discovered`, `Outreach`, `Applied`, `Screening`, `Interviewing`, `Offer`), `Outcome` (`Active`, `On Hold`, `Won`, `Declined`, `Rejected`, `Withdrawn`, `Ghosted`), `LastActivityAt`, `UpdatedAt`, and embedded `JobPosting` value object (source URL, raw text, parsed requirements, tech stack tags, stated min/max compensation, currency).
 - **Orthogonal Stage & Outcome + Stage Transitions (ADR-0002)**:
-  - Updating an **Opportunity**'s `stage` or `outcome` happens inside a single database transaction that updates the `opportunities` row, bumps `last_activity_at` (when appropriate), and inserts an immutable row into `stage_transitions` (`opportunity_id`, `from_stage`, `to_stage`, `from_outcome`, `to_outcome`, `transitioned_at`, `note`).
-  - Creating a new **Opportunity** records its initial `stage_transitions` entry (`from_stage = NULL`, `to_stage = initial_stage`, `to_outcome = 'Active'`).
-- **Flight Deck Staleness & Triage Engine**:
-  - The **Flight Deck** module computes actionable items deterministically using an injected clock and configurable staleness thresholds (defaults: `Discovered` > 3 days, `Outreach` > 4 days since last activity/interaction, `Applied` > 10 days, `Screening` / `Interviewing` > 5 days after the latest completed **Interview Round** with no upcoming round scheduled).
-  - It also returns: (a) **Interview Rounds** scheduled within the next 48 hours, (b) past **Interview Rounds** lacking a **Debrief**, and (c) open **Action Items** ordered by due date.
-- **Candidate Profile, Story Bank & Loop Story De-duplication**:
-  - `candidate_profile` stores the singleton record of experience entries, skills, target titles, location preferences, compensation floor/target, and summary.
-  - `stories` stores reusable STAR narratives (`title`, `hook`, `situation`, `task`, `action`, `result`, JSON arrays for `competency_tags` and `skill_tags`).
-  - `interview_round_stories` links `interview_round_id` and `story_id`. When querying or attaching **Stories** for an **Opportunity**'s **Interview Rounds**, the backend computes a `used_in_earlier_rounds` list (referencing the round title/sequence within the same `opportunity_id`) so the UI immediately flags duplicate story usage across the same company's interview loop.
+  - Calling `Opportunity.Transition(newStage, newOutcome, note, now)` validates the state change, updates `Stage`/`Outcome` and `LastActivityAt`, and returns an immutable `StageTransition` domain entity (`OpportunityID`, `FromStage`, `ToStage`, `FromOutcome`, `ToOutcome`, `TransitionedAt`, `Note`).
+  - Updating an **Opportunity**'s `Stage` or `Outcome` persists both the updated `Opportunity` and the new `StageTransition` inside a single `TxManager` transaction. Creating a new **Opportunity** records its initial `StageTransition` (`FromStage = ""`, `ToStage = initialStage`, `ToOutcome = "Active"`).
+- **Distinguishing `LastActivityAt` from `UpdatedAt`**:
+  - `LastActivityAt` only advances on meaningful pipeline, outreach, or interview progression: creating the `Opportunity`, a `Stage` or `Outcome` transition, logging an `Interaction` linked to the `Opportunity`, or scheduling/completing an `InterviewRound`.
+  - Cosmetic field/note edits, `FitAssessment` generation, or drafting an `ApplicationArtifact` update `UpdatedAt` without advancing `LastActivityAt`, ensuring ghosted roles are never accidentally hidden from the **Flight Deck**.
+- **Pure Domain `Flight Deck` Staleness & Triage Evaluator (`domain.EvaluateFlightDeck`)**:
+  - Evaluated in pure Go using an injected `Clock` and configurable staleness thresholds against domain snapshots:
+    - `Discovered` > 3 days measured from `max(LatestStageTransitionAt, LastActivityAt)`
+    - `Outreach` > 4 days measured from `max(LatestStageTransitionAt, LatestInteractionAt)`
+    - `Applied` > 10 days measured from `max(LatestStageTransitionAt, LastActivityAt)`
+    - `Screening` / `Interviewing` > 5 days measured from the latest completed `InterviewRound.ScheduledAt` when no future `InterviewRound` is scheduled
+  - Also returns: (a) **Interview Rounds** scheduled within the next 48 hours, (b) past/completed **Interview Rounds** lacking a **Debrief**, and (c) open **Action Items** ordered by due date.
+- **Candidate Profile, Story Bank & Loop Story De-duplication (`domain.DetectRepeatedStories`)**:
+  - `CandidateProfile` stores the singleton record of experience entries, skills, target titles, location preferences, compensation floor/target, and summary.
+  - `Story` stores reusable STAR narratives (`Title`, `Hook`, `Situation`, `Task`, `Action`, `Result`, `CompetencyTags`, `SkillTags`).
+  - `domain.DetectRepeatedStories(rounds []InterviewRound)` is a pure domain function that checks each round's linked `StoryID`s against earlier rounds of the same `Opportunity` (ordered by `RoundOrder`), ignoring `Cancelled` rounds, and produces a non-blocking `UsedInEarlierRounds` warning list (`RoundID`, `RoundOrder`, `Title`).
 - **Fit Assessments & Application Artifacts**:
-  - `fit_assessments` stores structured match evaluations per **Opportunity** (overall score/verdict, matched strengths, gaps/risks, compensation alignment note, recommended `story_ids`, and model used).
-  - `application_artifacts` stores role-specific materials per **Opportunity** (`kind`: `resume`, `cover_letter`, `screening_qa`, `other`; `title`; `content_markdown`; optional `file_path` and `mime_type` for uploaded PDFs; `is_submitted` flag).
-- **Interview Rounds & Debriefs**:
-  - `interview_rounds` belongs to an **Opportunity** (`round_order`, `round_type`, `title`, `scheduled_at`, `duration_minutes`, `status`, `prep_notes`).
-  - `debriefs` has a 1:1 relationship with `interview_rounds` (`questions_asked` JSON list, `went_well`, `to_improve`, `signals`, `confidence_score` 1–5, `follow_up_notes`).
+  - `FitAssessment` stores structured match evaluations per **Opportunity** (overall score/verdict, matched strengths, gaps/risks, compensation alignment note, recommended `StoryID`s, and model used).
+  - `ApplicationArtifact` stores role-specific materials per **Opportunity** (`Kind`: `resume`, `cover_letter`, `screening_qa`, `other`; `Title`; `ContentMarkdown`; optional `FilePath` and `MimeType` managed through the `ArtifactBlobStore` port in `internal/adapter/fs`; and `IsSubmitted` boolean).
+- **Interview Rounds, Debriefs & Structured Question Bank**:
+  - `InterviewRound` belongs to an **Opportunity** (`RoundOrder`, `RoundType`, `Title`, `ScheduledAt`, `DurationMinutes`, `Status` (`Scheduled` | `Completed` | `Cancelled`), `PrepNotes`, `ContactIDs`, `StoryIDs`, and optional 1:1 `Debrief`).
+  - `Debrief` captures structured `QuestionsAsked` value objects (`Question`, optional `Category`, optional `AnsweredWithStoryID`, `Notes`), `WentWell`, `ToImprove`, `Signals`, `ConfidenceScore` 1–5, and `FollowUpNotes`. Questions across all `Debriefs` can be projected alongside the **Story Bank** with their `Company`, `Opportunity`, `InterviewRound` type, and linked `Story`.
 - **Contacts, Opportunity Roles, Interactions & Action Items**:
-  - `contacts` stores global network entries (`name`, optional `company_id`, `title`, `email`, `linkedin_url`, `warmth`, `notes`).
-  - `opportunity_contacts` joins `opportunity_id` and `contact_id` with a `role` (`Referrer`, `Recruiter`, `Hiring Manager`, `Interviewer`, `Champion`, `Other`).
-  - `interview_round_contacts` joins `interview_round_id` and `contact_id`.
-  - `interactions` logs timestamped touchpoints (`contact_id`, optional `opportunity_id`, `kind`, `direction`, `occurred_at`, `summary`), automatically updating `last_activity_at` on the linked **Opportunity**.
-  - `action_items` stores tasks (`title`, optional `opportunity_id`, optional `contact_id`, `due_at`, `status`: `open` | `completed` | `dismissed`).
-- **Offers**:
-  - `offers` belongs to an **Opportunity** (`base_salary`, `bonus_target_pct`, `bonus_amount`, `equity_type`, `equity_total_value`, `equity_vesting_years`, `sign_on_bonus`, `currency`, `deadline_at`, `benefits_notes`, `negotiation_notes`, `status`), exposing computed annualized Year-1 and recurring total compensation.
-- **Pluggable AI & OpenRouter Integration Module**:
-  - A single deep `LLMClient` interface in Go supports `OpenRouter` (`https://openrouter.ai/api/v1`), `OpenAI`, `Anthropic`, `Gemini`, and custom OpenAI-compatible base URLs (e.g., local Ollama).
-  - Settings are persisted in a `settings` table (with environment variable fallbacks such as `OPENROUTER_API_KEY`), including `provider`, `fast_model`, `reasoning_model`, and `bookmarked_models`.
-  - A dedicated endpoint proxies/caches `GET https://openrouter.ai/api/v1/models` so the frontend can search and bookmark OpenRouter models, and every AI endpoint (`extract-job-posting`, `assess-fit`, `draft-artifact`) accepts an optional `model` override parameter.
-- **Job Posting URL Fetcher & Parser Module**:
-  - Given a URL, the backend fetches the page with a timeout and attempts structured extraction in priority order: (1) JSON-LD `<script type="application/ld+json">` matching `@type: JobPosting`, (2) known ATS structures (Greenhouse, Lever, Ashby), and (3) readable text extraction from the HTML body, before passing the extracted text (plus any user-pasted text) to the configured `fast_model` for structured JSON extraction.
+  - `Contact` stores global network entries (`Name`, optional `CompanyID`, `Title`, `Email`, `LinkedInURL`, `Warmth`, `Notes`).
+  - `OpportunityContact` links `OpportunityID` and `ContactID` with an explicit `Role` (`Referrer`, `Recruiter`, `Hiring Manager`, `Interviewer`, `Champion`, `Other`).
+  - Logging an `Interaction` (`ContactID`, optional `OpportunityID`, `Kind`, `Direction`, `OccurredAt`, `Summary`) runs inside `TxManager` to save the `Interaction`, advance `Opportunity.LastActivityAt`, and optionally create a follow-up `ActionItem`.
+  - `ActionItem` stores tasks (`Title`, optional `OpportunityID`, optional `ContactID`, `DueAt`, `Status`: `open` | `completed` | `dismissed`).
+- **Offers & Pure Domain Compensation Math**:
+  - Each `Opportunity` has `0..1` current `Offer` (`BaseSalary`, `BonusTargetPct`, `BonusAmount`, `EquityType`, `EquityTotalValue`, `EquityVestingYears`, `SignOnBonus`, `Currency`, `DeadlineAt`, `BenefitsNotes`, `NegotiationNotes`, `Status`).
+  - Pure domain methods compute `AnnualBonus` (`BonusAmount` if `> 0`, else `BaseSalary * BonusTargetPct / 100`), `AnnualEquity` (`EquityTotalValue / EquityVestingYears`, defaulting vesting years to `4` when `EquityTotalValue > 0` and vesting years is `0`), `RecurringAnnualTotalComp`, `Year1TotalComp`, and `DeltaVsCompFloor` against `CandidateProfile.CompensationFloor`.
+- **Pure Domain Funnel Analytics (`domain.ComputeFunnelAnalytics`)**:
+  - Computes stage reach counts, stage-to-stage conversion percentages, drop-off breakdowns by `Stage` and `Outcome`, and average days spent per `Stage` in pure Go over `Opportunities` and `StageTransitions`.
+- **Semantic AI Gateway (`AssistantGateway`) & Scraper (`JobPageParser`) Ports**:
+  - `JobPageParser` (`internal/adapter/scraper`) fetches a URL with a timeout and extracts any deterministic `JobPosting` metadata (from JSON-LD `<script type="application/ld+json">` matching `@type: JobPosting` or Greenhouse/Lever/Ashby HTML structures) plus cleaned readable text.
+  - `AssistantGateway` (`internal/adapter/ai`) encapsulates prompt construction and provider protocols (`OpenRouter`, `OpenAI`, `Anthropic`, `Gemini`, and custom OpenAI-compatible endpoints like Ollama), exposing semantic domain operations (`ExtractJobPosting`, `AssessFit`, `DraftArtifact`, `ListOpenRouterModels`) with optional per-request `modelOverride`.
+  - If no LLM API key is configured (or the LLM call fails), **Quick Capture** gracefully degrades to deterministic JSON-LD/ATS fields and raw pasted text without blocking the user.
+- **Sample Data Seeding & Backup Port**:
+  - Sample data seeding runs as a transactional use case in `internal/usecase` that constructs valid domain aggregates (including initial `StageTransitions`, repeated-story loop examples, and stale `Flight Deck` items) through `TxManager`.
+  - `BackupPort` supports exporting a full structured JSON workspace snapshot and a consistent SQLite snapshot (`VACUUM INTO`).
 
 ### Frontend Workspace Structure
 - Six top-level workspaces sharing a persistent sidebar and global **Quick Capture** (`Cmd+K` / button) modal:
@@ -136,16 +157,18 @@ Build the **Job Search Cockpit**: a local-first, single-user web application (Go
 ## Testing Decisions
 
 ### Philosophy
-Tests verify observable behavior through public interfaces at pre-agreed seams—never internal implementation details, private helpers, or tautological assertions.
+Tests verify observable behavior through public interfaces at pre-agreed seams—never internal implementation details, private helpers, or tautological mock assertions.
 
 ### Pre-Agreed Seams
-1. **Primary Backend Seam — Go HTTP Handler (`http.Handler` over `/api/*` with real SQLite)**:
-   - Backend integration tests instantiate the full server `http.Handler` backed by a fresh real SQLite database (with all migrations applied) and inject deterministic test adapters only at true external boundaries:
+1. **Pure Domain Unit Seam (`internal/domain` — Zero I/O, No Mocks)**:
+   - Fast unit tests verify pure domain invariants and evaluators directly: `Opportunity.Transition` orthogonality and `StageTransition` emission, `LastActivityAt` vs. `UpdatedAt` rules, `EvaluateFlightDeck` staleness and 48-hour interview windows, `DetectRepeatedStories` across non-cancelled `InterviewRounds`, `Offer` annualized compensation and floor delta math, and `ComputeFunnelAnalytics` conversion/duration calculations.
+2. **Primary Backend Integration Seam — Go HTTP Handler (`http.Handler` over `/api/*` with real SQLite)**:
+   - Backend integration tests instantiate the full server `http.Handler` wired with real `internal/usecase` and `internal/adapter/sqlite` repositories (with all migrations applied) and inject deterministic fakes only at external outbound ports:
      - `Clock` (for deterministic **Flight Deck** staleness thresholds and 48-hour **Interview Round** windows)
-     - `LLMProvider` (for deterministic **Job Posting** extraction, **Fit Assessment**, and **Application Artifact** drafting tests, plus verifying per-request `model` overrides)
-     - `PageFetcher` (for testing JSON-LD and ATS HTML parsing without live network calls)
-   - All domain behaviors (**Stage** vs. **Outcome** orthogonality, automatic **Stage Transition** creation, **Story** repeat-in-loop warnings, **Flight Deck** staleness computation, **Interaction** activity-timestamp updates, **Offer** annualized total-comp calculation, and **Analytics** conversion rates) are verified through HTTP requests and responses at this seam.
-2. **Frontend Seam — Top-Level Workspace Views (`@testing-library/react` + Vitest over `/api/*`)**:
+     - `AssistantGateway` / `LLMProvider` (for deterministic **Job Posting** extraction, **Fit Assessment**, and **Application Artifact** drafting tests, plus verifying per-request `model` overrides)
+     - `JobPageParser` / `PageFetcher` (for testing JSON-LD and ATS HTML parsing without live network calls)
+   - All end-to-end application behaviors and atomic `TxManager` side effects are verified through HTTP requests and responses at this seam.
+3. **Frontend Seam — Top-Level Workspace Views (`@testing-library/react` + Vitest over `/api/*`)**:
    - Frontend tests render the workspace views with a real router and query client against stubbed `/api/*` HTTP handlers, asserting user-visible text, roles, form submissions, filtering, and warning badges.
 
 ## Out of Scope
@@ -159,4 +182,4 @@ Tests verify observable behavior through public interfaces at pre-agreed seams�
 ## Further Notes
 
 - All domain terminology in code, API payloads, UI labels, and tests must follow `GLOSSARY.md` (`Company`, `Opportunity`, `Job Posting`, `Stage`, `Outcome`, `Stage Transition`, `Offer`, `Candidate Profile`, `Story`, `Story Bank`, `Fit Assessment`, `Application Artifact`, `Interview Round`, `Debrief`, `Contact`, `Interaction`, `Action Item`, `Flight Deck`).
-- Architectural constraints in `docs/adr/0001-local-first-single-user-architecture.md` and `docs/adr/0002-orthogonal-stage-and-outcome.md` govern the implementation.
+- Architectural constraints in `docs/adr/0001-local-first-single-user-architecture.md`, `docs/adr/0002-orthogonal-stage-and-outcome.md`, and `docs/adr/0003-concentric-clean-architecture-and-pure-domain-evaluators.md` govern the implementation.
