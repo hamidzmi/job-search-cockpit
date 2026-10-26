@@ -1,0 +1,21 @@
+# Local runtime data & SQLite
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Go build outputs
+/bin/
+/job-search-cockpit
+coverage.out
+
+# Frontend build & dependencies
+/web/node_modules/
+/web/dist/
+node_modules/
+dist/
+
+# OS & editor files
+.DS_Store
+.env
+.env.local
