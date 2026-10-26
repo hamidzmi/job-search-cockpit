@@ -22,9 +22,13 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 
 	companySvc := usecase.NewCompanyService(store, store, clock)
 	opportunitySvc := usecase.NewOpportunityService(store, store, store, store, clock)
+	profileSvc := usecase.NewCandidateProfileService(store, store, clock)
+	storySvc := usecase.NewStoryService(store, store, clock)
 
 	return httpadapter.NewRouter(
 		httpadapter.NewCompanyHandler(companySvc),
 		httpadapter.NewOpportunityHandler(opportunitySvc),
+		httpadapter.NewCandidateProfileHandler(profileSvc),
+		httpadapter.NewStoryHandler(storySvc),
 	)
 }

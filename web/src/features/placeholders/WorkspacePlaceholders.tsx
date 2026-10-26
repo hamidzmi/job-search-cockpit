@@ -21,21 +21,6 @@ export function FlightDeckWorkspace() {
   );
 }
 
-export function ProfileWorkspace() {
-  return (
-    <div className="workspace-container">
-      <header className="workspace-header">
-        <div>
-          <h2 className="workspace-title">Candidate Profile &amp; Story Bank</h2>
-          <p className="workspace-subtitle">
-            Canonical work history, compensation floor, and STAR Story Bank.
-          </p>
-        </div>
-      </header>
-    </div>
-  );
-}
-
 export function AnalyticsWorkspace() {
   return (
     <div className="workspace-container">
