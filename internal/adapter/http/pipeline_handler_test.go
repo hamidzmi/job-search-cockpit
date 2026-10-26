@@ -492,4 +492,320 @@ func TestOpportunitiesAPI_Filtering(t *testing.T) {
 	}
 }
 
+func TestContactsAndOpportunityRolesAPI(t *testing.T) {
+	t0 := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	clock := &manualClock{now: t0}
+	srv := newTestServer(t, clock)
+
+	compRec := doJSON(t, srv, http.MethodPost, "/api/companies", map[string]any{
+		"name":   "Stripe",
+		"domain": "stripe.com",
+	})
+	var stripe httpadapter.CompanyDTO
+	_ = json.Unmarshal(compRec.Body.Bytes(), &stripe)
+
+	opp1Rec := doJSON(t, srv, http.MethodPost, "/api/opportunities", map[string]any{
+		"company_id": stripe.ID,
+		"role_title": "Staff Core Payments Engineer",
+		"stage":      "Outreach",
+	})
+	var opp1 httpadapter.OpportunityDTO
+	_ = json.Unmarshal(opp1Rec.Body.Bytes(), &opp1)
+
+	opp2Rec := doJSON(t, srv, http.MethodPost, "/api/opportunities", map[string]any{
+		"company_id": stripe.ID,
+		"role_title": "Principal Ledger Architect",
+		"stage":      "Interviewing",
+	})
+	var opp2 httpadapter.OpportunityDTO
+	_ = json.Unmarshal(opp2Rec.Body.Bytes(), &opp2)
+
+	var aliceID, bobID string
+
+	t.Run("creates global contacts with optional company and validates warmth", func(t *testing.T) {
+		badRec := doJSON(t, srv, http.MethodPost, "/api/contacts", map[string]any{
+			"name":   "Invalid Warmth Contact",
+			"warmth": "Lukewarm",
+		})
+		if badRec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for invalid warmth, got %d: %s", badRec.Code, badRec.Body.String())
+		}
+
+		aliceRec := doJSON(t, srv, http.MethodPost, "/api/contacts", map[string]any{
+			"company_id":   stripe.ID,
+			"name":         "Alice Chen",
+			"title":        "Staff Payments Engineer",
+			"email":        "alice@stripe.com",
+			"linkedin_url": "https://linkedin.com/in/alicechen",
+			"warmth":       "Advocate",
+			"notes":        "Former teammate, happy to refer",
+		})
+		if aliceRec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 creating Alice, got %d: %s", aliceRec.Code, aliceRec.Body.String())
+		}
+		var alice httpadapter.ContactDTO
+		_ = json.Unmarshal(aliceRec.Body.Bytes(), &alice)
+		if alice.CompanyName != "Stripe" || alice.Warmth != "Advocate" {
+			t.Errorf("unexpected Alice DTO: %+v", alice)
+		}
+		aliceID = alice.ID
+
+		bobRec := doJSON(t, srv, http.MethodPost, "/api/contacts", map[string]any{
+			"name":   "Bob Martinez",
+			"title":  "Executive Tech Recruiter",
+			"email":  "bob@recruiting.example.com",
+			"warmth": "Warm",
+			"notes":  "Independent agency recruiter",
+		})
+		if bobRec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 creating Bob without company, got %d: %s", bobRec.Code, bobRec.Body.String())
+		}
+		var bob httpadapter.ContactDTO
+		_ = json.Unmarshal(bobRec.Body.Bytes(), &bob)
+		if bob.CompanyID != "" || bob.CompanyName != "" {
+			t.Errorf("expected empty company on Bob, got %+v", bob)
+		}
+		bobID = bob.ID
+	})
+
+	t.Run("edits contact and filters contacts by query, warmth, and company", func(t *testing.T) {
+		clock.now = clock.now.Add(time.Hour)
+		updRec := doJSON(t, srv, http.MethodPut, "/api/contacts/"+bobID, map[string]any{
+			"company_id": stripe.ID,
+			"name":       "Bob R. Martinez",
+			"title":      "Lead Technical Recruiter",
+			"email":      "bob@stripe.com",
+			"warmth":     "Warm",
+			"notes":      "Joined Stripe in-house recruiting",
+		})
+		if updRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 updating Bob, got %d: %s", updRec.Code, updRec.Body.String())
+		}
+
+		qRec := doJSON(t, srv, http.MethodGet, "/api/contacts?q=alice", nil)
+		var qList []httpadapter.ContactDTO
+		_ = json.Unmarshal(qRec.Body.Bytes(), &qList)
+		if len(qList) != 1 || qList[0].Name != "Alice Chen" {
+			t.Errorf("expected 1 contact matching query 'alice', got %+v", qList)
+		}
+
+		wRec := doJSON(t, srv, http.MethodGet, "/api/contacts?warmth=Advocate", nil)
+		var wList []httpadapter.ContactDTO
+		_ = json.Unmarshal(wRec.Body.Bytes(), &wList)
+		if len(wList) != 1 || wList[0].ID != aliceID {
+			t.Errorf("expected 1 Advocate contact, got %+v", wList)
+		}
+	})
+
+	t.Run("links one contact to multiple opportunities and multiple contacts with distinct roles to one opportunity", func(t *testing.T) {
+		// Link Alice as Referrer on Opp 1 and Champion on Opp 2
+		r1 := doJSON(t, srv, http.MethodPost, "/api/opportunities/"+opp1.ID+"/contacts", map[string]any{
+			"contact_id": aliceID,
+			"role":       "Referrer",
+			"notes":      "Submitted referral in Greenhouse",
+		})
+		if r1.Code != http.StatusCreated && r1.Code != http.StatusOK {
+			t.Fatalf("failed linking Alice to opp1: %d %s", r1.Code, r1.Body.String())
+		}
+
+		r2 := doJSON(t, srv, http.MethodPost, "/api/opportunities/"+opp2.ID+"/contacts", map[string]any{
+			"contact_id": aliceID,
+			"role":       "Champion",
+			"notes":      "Advising on architecture loop",
+		})
+		if r2.Code != http.StatusCreated && r2.Code != http.StatusOK {
+			t.Fatalf("failed linking Alice to opp2: %d %s", r2.Code, r2.Body.String())
+		}
+
+		// Link Bob as Recruiter on Opp 1
+		r3 := doJSON(t, srv, http.MethodPost, "/api/opportunities/"+opp1.ID+"/contacts", map[string]any{
+			"contact_id": bobID,
+			"role":       "Recruiter",
+			"notes":      "Primary recruiter point of contact",
+		})
+		if r3.Code != http.StatusCreated && r3.Code != http.StatusOK {
+			t.Fatalf("failed linking Bob to opp1: %d %s", r3.Code, r3.Body.String())
+		}
+
+		// Inspect Opp 1 linked contacts
+		oppContactsRec := doJSON(t, srv, http.MethodGet, "/api/opportunities/"+opp1.ID+"/contacts", nil)
+		if oppContactsRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 listing opp1 contacts, got %d", oppContactsRec.Code)
+		}
+		var oppContacts []httpadapter.OpportunityContactDTO
+		_ = json.Unmarshal(oppContactsRec.Body.Bytes(), &oppContacts)
+		if len(oppContacts) != 2 {
+			t.Fatalf("expected 2 contacts linked to opp1, got %d: %+v", len(oppContacts), oppContacts)
+		}
+
+		// Inspect Alice in global contacts list to verify both linked opportunities appear with their roles
+		allContactsRec := doJSON(t, srv, http.MethodGet, "/api/contacts?q=Alice", nil)
+		var contacts []httpadapter.ContactDTO
+		_ = json.Unmarshal(allContactsRec.Body.Bytes(), &contacts)
+		if len(contacts) != 1 || len(contacts[0].LinkedOpportunities) != 2 {
+			t.Fatalf("expected Alice to have 2 linked opportunities, got %+v", contacts)
+		}
+
+		// Unlink Bob from Opp 1
+		delRec := doJSON(t, srv, http.MethodDelete, "/api/opportunities/"+opp1.ID+"/contacts/"+bobID, nil)
+		if delRec.Code != http.StatusNoContent && delRec.Code != http.StatusOK {
+			t.Fatalf("expected 204/200 unlinking Bob, got %d", delRec.Code)
+		}
+		oppContactsAfterRec := doJSON(t, srv, http.MethodGet, "/api/opportunities/"+opp1.ID+"/contacts", nil)
+		var oppContactsAfter []httpadapter.OpportunityContactDTO
+		_ = json.Unmarshal(oppContactsAfterRec.Body.Bytes(), &oppContactsAfter)
+		if len(oppContactsAfter) != 1 || oppContactsAfter[0].ContactID != aliceID {
+			t.Fatalf("expected only Alice remaining on opp1, got %+v", oppContactsAfter)
+		}
+	})
+}
+
+func TestInteractionsAndActionItemsAPI_AtomicActivityAndFollowUp(t *testing.T) {
+	t0 := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	clock := &manualClock{now: t0}
+	srv := newTestServer(t, clock)
+
+	compRec := doJSON(t, srv, http.MethodPost, "/api/companies", map[string]any{"name": "Anthropic"})
+	var comp httpadapter.CompanyDTO
+	_ = json.Unmarshal(compRec.Body.Bytes(), &comp)
+
+	oppRec := doJSON(t, srv, http.MethodPost, "/api/opportunities", map[string]any{
+		"company_id": comp.ID,
+		"role_title": "Staff Distributed Systems Engineer",
+		"stage":      "Outreach",
+	})
+	var opp httpadapter.OpportunityDTO
+	_ = json.Unmarshal(oppRec.Body.Bytes(), &opp)
+
+	cntRec := doJSON(t, srv, http.MethodPost, "/api/contacts", map[string]any{
+		"company_id": comp.ID,
+		"name":       "Dario Example",
+		"title":      "Engineering Manager",
+		"warmth":     "Warm",
+	})
+	var contact httpadapter.ContactDTO
+	_ = json.Unmarshal(cntRec.Body.Bytes(), &contact)
+
+	interactionTime := t0.Add(72 * time.Hour)
+	followUpDue := t0.Add(144 * time.Hour)
+	clock.now = interactionTime
+
+	t.Run("logging an interaction linked to an opportunity atomically advances LastActivityAt and creates follow-up ActionItem", func(t *testing.T) {
+		rec := doJSON(t, srv, http.MethodPost, "/api/interactions", map[string]any{
+			"contact_id":     contact.ID,
+			"opportunity_id": opp.ID,
+			"kind":           "Referral Request",
+			"direction":      "Outbound",
+			"occurred_at":    interactionTime.Format(time.RFC3339),
+			"summary":        "Sent tailored resume and asked about team headcount",
+			"follow_up": map[string]any{
+				"title":  "Follow up with Dario on referral request",
+				"due_at": followUpDue.Format(time.RFC3339),
+				"notes":  "Nudge if no reply in 3 days",
+			},
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 logging interaction, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var result httpadapter.LogInteractionResponseDTO
+		if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+			t.Fatalf("decode interaction response failed: %v", err)
+		}
+		if result.Interaction.Kind != "Referral Request" || result.Interaction.ContactName != "Dario Example" {
+			t.Errorf("unexpected interaction DTO: %+v", result.Interaction)
+		}
+		if result.FollowUpActionItem == nil || result.FollowUpActionItem.Title != "Follow up with Dario on referral request" {
+			t.Fatalf("expected follow-up ActionItem in response, got %+v", result.FollowUpActionItem)
+		}
+
+		// Verify Opportunity LastActivityAt advanced to interactionTime
+		oppGetRec := doJSON(t, srv, http.MethodGet, "/api/opportunities/"+opp.ID, nil)
+		var updatedOpp httpadapter.OpportunityDTO
+		_ = json.Unmarshal(oppGetRec.Body.Bytes(), &updatedOpp)
+		if !updatedOpp.LastActivityAt.Equal(interactionTime) {
+			t.Errorf("expected Opportunity.LastActivityAt to advance to %v, got %v", interactionTime, updatedOpp.LastActivityAt)
+		}
+
+		// Verify Interaction appears when filtering by contact_id and opportunity_id
+		byContactRec := doJSON(t, srv, http.MethodGet, "/api/interactions?contact_id="+contact.ID, nil)
+		var byContact []httpadapter.InteractionDTO
+		_ = json.Unmarshal(byContactRec.Body.Bytes(), &byContact)
+		if len(byContact) != 1 || byContact[0].Summary != "Sent tailored resume and asked about team headcount" {
+			t.Errorf("expected 1 interaction for contact, got %+v", byContact)
+		}
+
+		byOppRec := doJSON(t, srv, http.MethodGet, "/api/interactions?opportunity_id="+opp.ID, nil)
+		var byOpp []httpadapter.InteractionDTO
+		_ = json.Unmarshal(byOppRec.Body.Bytes(), &byOpp)
+		if len(byOpp) != 1 {
+			t.Errorf("expected 1 interaction for opportunity, got %+v", byOpp)
+		}
+	})
+
+	t.Run("creates standalone ActionItem, edits due date and title, completes, and dismisses", func(t *testing.T) {
+		createRec := doJSON(t, srv, http.MethodPost, "/api/action-items", map[string]any{
+			"title":          "Send thank-you note after coffee chat",
+			"opportunity_id": opp.ID,
+			"contact_id":     contact.ID,
+			"due_at":         followUpDue.Add(24 * time.Hour).Format(time.RFC3339),
+			"notes":          "Mention distributed consensus paper",
+		})
+		if createRec.Code != http.StatusCreated {
+			t.Fatalf("expected 201 creating action item, got %d: %s", createRec.Code, createRec.Body.String())
+		}
+		var created httpadapter.ActionItemDTO
+		_ = json.Unmarshal(createRec.Body.Bytes(), &created)
+		if created.Status != "open" || created.ContactName != "Dario Example" {
+			t.Errorf("unexpected created ActionItem: %+v", created)
+		}
+
+		// List open action items (should have 2: the follow-up + this standalone one)
+		openRec := doJSON(t, srv, http.MethodGet, "/api/action-items?status=open", nil)
+		var openItems []httpadapter.ActionItemDTO
+		_ = json.Unmarshal(openRec.Body.Bytes(), &openItems)
+		if len(openItems) != 2 {
+			t.Fatalf("expected 2 open action items, got %d: %+v", len(openItems), openItems)
+		}
+
+		// Complete the standalone action item
+		clock.now = clock.now.Add(2 * time.Hour)
+		completeRec := doJSON(t, srv, http.MethodPut, "/api/action-items/"+created.ID, map[string]any{
+			"title":          "Send thank-you note after coffee chat",
+			"opportunity_id": opp.ID,
+			"contact_id":     contact.ID,
+			"due_at":         created.DueAt.Format(time.RFC3339),
+			"status":         "completed",
+			"notes":          "Sent via email",
+		})
+		if completeRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 completing action item, got %d: %s", completeRec.Code, completeRec.Body.String())
+		}
+		var completed httpadapter.ActionItemDTO
+		_ = json.Unmarshal(completeRec.Body.Bytes(), &completed)
+		if completed.Status != "completed" {
+			t.Errorf("expected status 'completed', got %q", completed.Status)
+		}
+
+		// Dismiss the follow-up action item
+		followUpID := openItems[0].ID
+		dismissRec := doJSON(t, srv, http.MethodPut, "/api/action-items/"+followUpID, map[string]any{
+			"title":          openItems[0].Title,
+			"opportunity_id": openItems[0].OpportunityID,
+			"contact_id":     openItems[0].ContactID,
+			"due_at":         openItems[0].DueAt.Format(time.RFC3339),
+			"status":         "dismissed",
+			"notes":          "He replied before the follow-up date",
+		})
+		if dismissRec.Code != http.StatusOK {
+			t.Fatalf("expected 200 dismissing action item, got %d: %s", dismissRec.Code, dismissRec.Body.String())
+		}
+		var dismissed httpadapter.ActionItemDTO
+		_ = json.Unmarshal(dismissRec.Body.Bytes(), &dismissed)
+		if dismissed.Status != "dismissed" {
+			t.Errorf("expected status 'dismissed', got %q", dismissed.Status)
+		}
+	})
+}
+
+
 
