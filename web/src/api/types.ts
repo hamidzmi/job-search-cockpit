@@ -133,3 +133,84 @@ export interface OpportunityFilter {
   company_id?: string;
   q?: string;
 }
+
+export const AI_PROVIDERS = [
+  'openrouter',
+  'openai',
+  'anthropic',
+  'gemini',
+  'ollama',
+] as const;
+
+export type AIProvider = (typeof AI_PROVIDERS)[number];
+
+export interface AISettings {
+  provider: AIProvider;
+  base_url: string;
+  api_key: string;
+  has_api_key: boolean;
+  is_configured: boolean;
+  fast_extraction_model: string;
+  reasoning_tailoring_model: string;
+  bookmarked_models: string[];
+  updated_at: string;
+}
+
+export interface AISettingsUpsertInput {
+  provider: AIProvider;
+  base_url: string;
+  api_key: string;
+  fast_extraction_model: string;
+  reasoning_tailoring_model: string;
+  bookmarked_models: string[];
+}
+
+export interface OpenRouterModel {
+  id: string;
+  name: string;
+  description: string;
+  context_length: number;
+  prompt_pricing: string;
+  completion_pricing: string;
+}
+
+export interface QuickCaptureExtractInput {
+  source_url: string;
+  raw_text: string;
+  model_override?: string;
+}
+
+export interface ExtractedJobPostingDraft {
+  company_name: string;
+  company_domain: string;
+  role_title: string;
+  seniority: string;
+  location: string;
+  remote_policy: RemotePolicy | '';
+  stated_min_comp: number;
+  stated_max_comp: number;
+  currency: string;
+  tech_stack_tags: string[];
+  requirements: string[];
+  source_url: string;
+  raw_text: string;
+  extraction_source: string;
+  model_used: string;
+  fetch_warning: string;
+  assistant_warning: string;
+}
+
+export interface QuickCaptureSaveInput {
+  company_id?: string;
+  company_name: string;
+  company_domain: string;
+  role_title: string;
+  seniority: string;
+  location: string;
+  remote_policy: RemotePolicy | '';
+  priority: Priority;
+  stage?: Stage;
+  transition_note: string;
+  notes: string;
+  job_posting: JobPostingInput;
+}

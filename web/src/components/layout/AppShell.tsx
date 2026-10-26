@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { QuickCaptureModal } from '../../features/quick-capture/QuickCaptureModal';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Flight Deck', end: true },
@@ -11,6 +12,19 @@ const NAV_ITEMS = [
 ];
 
 export function AppShell() {
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQuickCaptureOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <div className="cockpit-layout">
       <aside className="cockpit-sidebar">
@@ -21,6 +35,15 @@ export function AppShell() {
             <p className="brand-subtitle">Local-First Career Command</p>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => setQuickCaptureOpen(true)}
+        >
+          + Quick Capture
+        </button>
+
         <nav className="sidebar-nav" aria-label="Workspace Navigation">
           {NAV_ITEMS.map((item) => (
             <NavLink
@@ -39,6 +62,9 @@ export function AppShell() {
       <main className="cockpit-main">
         <Outlet />
       </main>
+      {quickCaptureOpen && (
+        <QuickCaptureModal onClose={() => setQuickCaptureOpen(false)} />
+      )}
     </div>
   );
 }

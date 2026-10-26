@@ -3,16 +3,17 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	_ "embed"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	_ "modernc.org/sqlite"
 )
 
-//go:embed migrations/0001_pipeline_spine.sql
-var initialMigrationSQL string
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 type dbExecutor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -35,10 +36,30 @@ func OpenAndMigrate(dbPath string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.Exec(initialMigrationSQL); err != nil {
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("apply migrations: %w", err)
+		return nil, fmt.Errorf("read migrations directory: %w", err)
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		sqlBytes, readErr := migrationsFS.ReadFile(filepath.Join("migrations", entry.Name()))
+		if readErr != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("read migration %s: %w", entry.Name(), readErr)
+		}
+		if _, execErr := db.Exec(string(sqlBytes)); execErr != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("apply migration %s: %w", entry.Name(), execErr)
+		}
+	}
+
 	return &Store{db: db}, nil
 }
 

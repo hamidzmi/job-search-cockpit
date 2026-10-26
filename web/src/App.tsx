@@ -8,8 +8,8 @@ import {
   AnalyticsWorkspace,
   FlightDeckWorkspace,
   ProfileWorkspace,
-  SettingsWorkspace,
 } from './features/placeholders/WorkspacePlaceholders';
+import { SettingsWorkspace } from './features/settings/SettingsWorkspace';
 
 export function AppRoutes() {
   return (
