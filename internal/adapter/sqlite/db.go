@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -46,10 +47,10 @@ func OpenAndMigrate(dbPath string) (*Store, error) {
 		return entries[i].Name() < entries[j].Name()
 	})
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
 			continue
 		}
-		sqlBytes, err := migrationsFS.ReadFile("migrations/" + entry.Name())
+		sqlBytes, err := migrationsFS.ReadFile(filepath.Join("migrations", entry.Name()))
 		if err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("read migration %s: %w", entry.Name(), err)
@@ -66,4 +67,3 @@ func OpenAndMigrate(dbPath string) (*Store, error) {
 func (s *Store) Close() error {
 	return s.db.Close()
 }
-

@@ -134,6 +134,75 @@ export interface OpportunityFilter {
   q?: string;
 }
 
+export interface WorkHistoryEntry {
+  company: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  summary: string;
+  impact_bullets: string[];
+}
+
+export interface CandidateProfile {
+  full_name: string;
+  headline: string;
+  summary: string;
+  work_history: WorkHistoryEntry[];
+  skills: string[];
+  target_role_titles: string[];
+  location_preferences: string[];
+  remote_preference: string;
+  compensation_floor: number;
+  target_compensation: number;
+  currency: string;
+  updated_at: string;
+}
+
+export interface CandidateProfileUpsertInput {
+  full_name: string;
+  headline: string;
+  summary: string;
+  work_history: WorkHistoryEntry[];
+  skills: string[];
+  target_role_titles: string[];
+  location_preferences: string[];
+  remote_preference: string;
+  compensation_floor: number;
+  target_compensation: number;
+  currency: string;
+}
+
+export interface Story {
+  id: string;
+  title: string;
+  hook: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  competency_tags: string[];
+  skill_tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoryUpsertInput {
+  title: string;
+  hook: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  competency_tags: string[];
+  skill_tags: string[];
+}
+
+export interface StoryFilter {
+  q?: string;
+  competency_tag?: string;
+  skill_tag?: string;
+}
+
 export const CONTACT_WARMTHS = ['Cold', 'Warm', 'Advocate'] as const;
 export type ContactWarmth = (typeof CONTACT_WARMTHS)[number];
 
@@ -305,4 +374,3 @@ export interface LogInteractionResponse {
   interaction: Interaction;
   follow_up_action_item?: ActionItem;
 }
-
