@@ -56,27 +56,13 @@ func (s *Store) GetOfferByOpportunityID(ctx context.Context, opportunityID strin
 		WHERE opportunity_id = ?
 	`, opportunityID)
 
-	var offer domain.Offer
-	var statusStr, deadlineStr, createdStr, updatedStr string
-	err := row.Scan(
-		&offer.ID, &offer.OpportunityID, &offer.BaseSalary, &offer.BonusTargetPct, &offer.BonusAmount,
-		&offer.EquityType, &offer.EquityTotalValue, &offer.EquityVestingYears, &offer.SignOnBonus,
-		&offer.Currency, &deadlineStr, &offer.BenefitsNotes, &offer.NegotiationNotes, &statusStr,
-		&createdStr, &updatedStr,
-	)
+	offer, err := scanOffer(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Offer{}, fmt.Errorf("%w: offer for opportunity %s", domain.ErrNotFound, opportunityID)
 	}
 	if err != nil {
 		return domain.Offer{}, err
 	}
-
-	offer.Status = domain.OfferStatus(statusStr)
-	if deadlineStr != "" {
-		offer.DeadlineAt, _ = time.Parse(time.RFC3339Nano, deadlineStr)
-	}
-	offer.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdStr)
-	offer.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedStr)
 	return offer, nil
 }
 
@@ -103,27 +89,36 @@ func (s *Store) ListOffers(ctx context.Context) ([]domain.Offer, error) {
 
 	var result []domain.Offer
 	for rows.Next() {
-		var offer domain.Offer
-		var statusStr, deadlineStr, createdStr, updatedStr string
-		err := rows.Scan(
-			&offer.ID, &offer.OpportunityID, &offer.BaseSalary, &offer.BonusTargetPct, &offer.BonusAmount,
-			&offer.EquityType, &offer.EquityTotalValue, &offer.EquityVestingYears, &offer.SignOnBonus,
-			&offer.Currency, &deadlineStr, &offer.BenefitsNotes, &offer.NegotiationNotes, &statusStr,
-			&createdStr, &updatedStr,
-		)
+		offer, err := scanOffer(rows)
 		if err != nil {
 			return nil, err
 		}
-		offer.Status = domain.OfferStatus(statusStr)
-		if deadlineStr != "" {
-			offer.DeadlineAt, _ = time.Parse(time.RFC3339Nano, deadlineStr)
-		}
-		offer.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdStr)
-		offer.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedStr)
 		result = append(result, offer)
 	}
 	if result == nil {
 		result = []domain.Offer{}
 	}
 	return result, rows.Err()
+}
+
+func scanOffer(s scanner) (domain.Offer, error) {
+	var offer domain.Offer
+	var statusStr, deadlineStr, createdStr, updatedStr string
+	err := s.Scan(
+		&offer.ID, &offer.OpportunityID, &offer.BaseSalary, &offer.BonusTargetPct, &offer.BonusAmount,
+		&offer.EquityType, &offer.EquityTotalValue, &offer.EquityVestingYears, &offer.SignOnBonus,
+		&offer.Currency, &deadlineStr, &offer.BenefitsNotes, &offer.NegotiationNotes, &statusStr,
+		&createdStr, &updatedStr,
+	)
+	if err != nil {
+		return domain.Offer{}, err
+	}
+
+	offer.Status = domain.OfferStatus(statusStr)
+	if deadlineStr != "" {
+		offer.DeadlineAt, _ = time.Parse(time.RFC3339Nano, deadlineStr)
+	}
+	offer.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdStr)
+	offer.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedStr)
+	return offer, nil
 }

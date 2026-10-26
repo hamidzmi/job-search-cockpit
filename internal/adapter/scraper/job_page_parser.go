@@ -42,6 +42,9 @@ var (
 	ghCompanyRegex     = regexp.MustCompile(`(?is)<[^>]*class=["'][^"']*company-name[^"']*["'][^>]*>(.*?)</[^>]+>`)
 	ghLocationRegex    = regexp.MustCompile(`(?is)<[^>]*class=["'][^"']*location[^"']*["'][^>]*>(.*?)</[^>]+>`)
 	leverHeadlineRegex = regexp.MustCompile(`(?is)<div[^>]*class=["'][^"']*posting-headline[^"']*["'][^>]*>.*?<h2[^>]*>(.*?)</h2>`)
+	ashbyTitleRegex    = regexp.MustCompile(`(?is)<[^>]+(?:data-testid=["'](?:job-title|title)["']|class=["'][^"']*(?:_headingTitle_|_title_|ashby-job-posting-heading|ashby-job-posting-title)[^"']*["'])[^>]*>(.*?)</[^>]+>`)
+	ashbyLocationRegex = regexp.MustCompile(`(?is)<[^>]+(?:data-testid=["'](?:job-location|location)["']|class=["'][^"']*(?:_location_|_jobPostingBrief_|ashby-job-posting-brief|ashby-job-posting-location)[^"']*["'])[^>]*>(.*?)</[^>]+>`)
+	ashbyCompanyRegex  = regexp.MustCompile(`(?is)<[^>]+(?:data-testid=["']company-name["']|class=["'][^"']*(?:_companyName_|ashby-job-posting-company)[^"']*["'])[^>]*>(.*?)</[^>]+>`)
 )
 
 func (p *HTTPJobPageParser) ParseJobPage(ctx context.Context, rawURL string) (domain.ParsedJobPage, error) {
@@ -308,20 +311,94 @@ func enrichFromATSHTML(out *domain.ParsedJobPage, sourceURL, rawHTML string) {
 	}
 
 	// Ashby layout
-	if strings.Contains(lowerURL, "ashbyhq.com") {
+	if strings.Contains(lowerURL, "ashbyhq.com") || strings.Contains(lowerHTML, "ashby-job-posting") || strings.Contains(lowerHTML, "jobs.ashbyhq") {
 		if out.DetectedSource == "html" {
 			out.DetectedSource = "ashby"
 		}
+		if out.RoleTitle == "" {
+			out.RoleTitle = extractFirstGroupText(ashbyTitleRegex, rawHTML)
+		}
+		if out.RoleTitle == "" {
+			out.RoleTitle = extractMetaTag(rawHTML, "og:title")
+		}
+		if out.RoleTitle == "" {
+			out.RoleTitle = extractMetaTag(rawHTML, "twitter:title")
+		}
+		if out.CompanyName == "" {
+			comp := extractFirstGroupText(ashbyCompanyRegex, rawHTML)
+			if comp == "" {
+				comp = extractMetaTag(rawHTML, "og:site_name")
+			}
+			if comp == "" {
+				comp = extractAshbyCompanyFromURL(sourceURL)
+			}
+			out.CompanyName = comp
+		}
+		if out.Location == "" {
+			loc := extractFirstGroupText(ashbyLocationRegex, rawHTML)
+			if loc == "" {
+				loc = extractMetaTag(rawHTML, "ashby:location")
+			}
+			if loc == "" {
+				loc = extractMetaTag(rawHTML, "location")
+			}
+			if loc == "" {
+				loc = extractMetaTag(rawHTML, "og:locality")
+			}
+			out.Location = loc
+		}
 	}
 
-	// Title / H1 fallback
+	// Title / H1 / OpenGraph meta fallback
 	titleText := extractFirstGroupText(titleTagRegex, rawHTML)
+	if titleText == "" {
+		titleText = extractMetaTag(rawHTML, "og:title")
+	}
 	if out.RoleTitle == "" {
 		out.RoleTitle = extractFirstGroupText(h1TagRegex, rawHTML)
 	}
 	if titleText != "" && (out.RoleTitle == "" || out.CompanyName == "") {
 		parseTitleTagForRoleAndCompany(titleText, out)
 	}
+	if out.CompanyName == "" {
+		out.CompanyName = extractMetaTag(rawHTML, "og:site_name")
+	}
+	if out.Location == "" {
+		out.Location = extractMetaTag(rawHTML, "location")
+	}
+}
+
+func extractMetaTag(rawHTML, nameOrProp string) string {
+	pattern := fmt.Sprintf(`(?is)<meta[^>]+(?:property|name)=["']%s["'][^>]+content=["']([^"']*)["']`, regexp.QuoteMeta(nameOrProp))
+	re := regexp.MustCompile(pattern)
+	if m := re.FindStringSubmatch(rawHTML); len(m) > 1 && strings.TrimSpace(m[1]) != "" {
+		return cleanInlineHTML(m[1])
+	}
+	patternRev := fmt.Sprintf(`(?is)<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']%s["']`, regexp.QuoteMeta(nameOrProp))
+	reRev := regexp.MustCompile(patternRev)
+	if m := reRev.FindStringSubmatch(rawHTML); len(m) > 1 && strings.TrimSpace(m[1]) != "" {
+		return cleanInlineHTML(m[1])
+	}
+	return ""
+}
+
+func extractAshbyCompanyFromURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) > 0 && parts[0] != "" {
+		slug := parts[0]
+		words := strings.Fields(strings.ReplaceAll(slug, "-", " "))
+		for i, w := range words {
+			if len(w) > 0 {
+				words[i] = strings.ToUpper(w[:1]) + w[1:]
+			}
+		}
+		return strings.Join(words, " ")
+	}
+	return ""
 }
 
 func parseTitleTagForRoleAndCompany(titleText string, out *domain.ParsedJobPage) {
@@ -357,6 +434,9 @@ func parseTitleTagForRoleAndCompany(titleText string, out *domain.ParsedJobPage)
 			}
 			return
 		}
+	}
+	if out.RoleTitle == "" {
+		out.RoleTitle = cleaned
 	}
 }
 

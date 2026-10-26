@@ -183,6 +183,7 @@ func TestComputeFunnelAnalytics(t *testing.T) {
 
 	tests := []struct {
 		name                 string
+		now                  time.Time
 		opportunities        []domain.Opportunity
 		transitions          []domain.StageTransition
 		wantTotal            int
@@ -341,11 +342,73 @@ func TestComputeFunnelAnalytics(t *testing.T) {
 				domain.StageOffer:        6.0, // 6 / 1 = 6.0
 			},
 		},
+		{
+			name: "does not count On Hold as drop-off and correctly resumes duration tracking upon reactivation",
+			now:  day(10),
+			opportunities: []domain.Opportunity{
+				{
+					ID:        "opp-onhold-reactivated",
+					CompanyID: "comp-1",
+					RoleTitle: "Staff Engineer",
+					Stage:     domain.StageScreening,
+					Outcome:   domain.OutcomeActive,
+				},
+				{
+					ID:        "opp-staying-onhold",
+					CompanyID: "comp-2",
+					RoleTitle: "Lead Engineer",
+					Stage:     domain.StageDiscovered,
+					Outcome:   domain.OutcomeOnHold,
+				},
+			},
+			transitions: []domain.StageTransition{
+				// opp-onhold-reactivated:
+				// Day 0: Discovered -> Screening (Active)
+				{ID: "tr-r1", OpportunityID: "opp-onhold-reactivated", FromStage: "", ToStage: domain.StageScreening, FromOutcome: "", ToOutcome: domain.OutcomeActive, TransitionedAt: day(0)},
+				// Day 2: Screening goes On Hold (duration: 2 days)
+				{ID: "tr-r2", OpportunityID: "opp-onhold-reactivated", FromStage: domain.StageScreening, ToStage: domain.StageScreening, FromOutcome: domain.OutcomeActive, ToOutcome: domain.OutcomeOnHold, TransitionedAt: day(2)},
+				// Day 6: Screening reactivated to Active (on hold for 4 days, not counted)
+				{ID: "tr-r3", OpportunityID: "opp-onhold-reactivated", FromStage: domain.StageScreening, ToStage: domain.StageScreening, FromOutcome: domain.OutcomeOnHold, ToOutcome: domain.OutcomeActive, TransitionedAt: day(6)},
+				// Evaluated at now = day(10): duration from day 6 to day 10 = 4 days. Total days = 2 + 4 = 6 days.
+
+				// opp-staying-onhold:
+				// Day 0: Discovered (Active)
+				{ID: "tr-h1", OpportunityID: "opp-staying-onhold", FromStage: "", ToStage: domain.StageDiscovered, FromOutcome: "", ToOutcome: domain.OutcomeActive, TransitionedAt: day(0)},
+				// Day 3: Discovered goes On Hold (duration: 3 days)
+				{ID: "tr-h2", OpportunityID: "opp-staying-onhold", FromStage: domain.StageDiscovered, ToStage: domain.StageDiscovered, FromOutcome: domain.OutcomeActive, ToOutcome: domain.OutcomeOnHold, TransitionedAt: day(3)},
+			},
+			wantTotal:  2,
+			wantActive: 1, // only opp-onhold-reactivated
+			wantReachedByStage: map[domain.Stage]int{
+				domain.StageDiscovered: 1,
+				domain.StageScreening:  1,
+			},
+			wantDropOffByStage: map[domain.Stage]int{
+				domain.StageDiscovered: 0, // On Hold is NOT a drop-off
+				domain.StageScreening:  0, // Active
+			},
+			wantOutcomeAtStage: map[domain.Stage]map[domain.Outcome]int{
+				domain.StageDiscovered: {
+					domain.OutcomeOnHold: 1,
+				},
+				domain.StageScreening: {
+					domain.OutcomeActive: 1,
+				},
+			},
+			wantAvgDaysByStage: map[domain.Stage]float64{
+				domain.StageDiscovered: 3.0, // 3 / 1 = 3.0
+				domain.StageScreening:  6.0, // (2 + 4) / 1 = 6.0 (reactivation resumed calculation!)
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			analytics := domain.ComputeFunnelAnalytics(tc.opportunities, tc.transitions, now)
+			evalNow := tc.now
+			if evalNow.IsZero() {
+				evalNow = now
+			}
+			analytics := domain.ComputeFunnelAnalytics(tc.opportunities, tc.transitions, evalNow)
 			if analytics.TotalOpportunities != tc.wantTotal {
 				t.Errorf("TotalOpportunities = %d, want %d", analytics.TotalOpportunities, tc.wantTotal)
 			}

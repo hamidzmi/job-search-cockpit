@@ -82,7 +82,8 @@ func ComputeFunnelAnalytics(opportunities []Opportunity, transitions []StageTran
 		if opp.Stage.IsValid() {
 			if idx, ok := stageIndices[opp.Stage]; ok {
 				result.Stages[idx].OutcomeBreakdown[opp.Outcome]++
-				if opp.Outcome != OutcomeActive && opp.Outcome != OutcomeWon {
+				switch opp.Outcome {
+				case OutcomeRejected, OutcomeGhosted, OutcomeWithdrawn, OutcomeDeclined:
 					result.Stages[idx].DropOffCount++
 				}
 			}
@@ -106,23 +107,33 @@ func ComputeFunnelAnalytics(opportunities []Opportunity, transitions []StageTran
 
 				if tr.ToStage != currStage {
 					dur := tr.TransitionedAt.Sub(stageStartTime).Hours() / 24.0
-					if dur > 0 {
+					if dur > 0 && !isClosed {
 						totalDaysByStage[currStage] += dur
 					}
 					currStage = tr.ToStage
 					stageStartTime = tr.TransitionedAt
-					if tr.ToOutcome != "" && tr.ToOutcome != OutcomeActive {
-						isClosed = true
+					if tr.ToOutcome != "" {
+						isClosed = (tr.ToOutcome != OutcomeActive)
 					} else {
 						isClosed = false
 					}
-				} else if tr.ToOutcome != "" && tr.ToOutcome != OutcomeActive {
-					dur := tr.TransitionedAt.Sub(stageStartTime).Hours() / 24.0
-					if dur > 0 {
-						totalDaysByStage[currStage] += dur
+				} else if tr.ToOutcome != "" {
+					if tr.ToOutcome != OutcomeActive {
+						if !isClosed {
+							dur := tr.TransitionedAt.Sub(stageStartTime).Hours() / 24.0
+							if dur > 0 {
+								totalDaysByStage[currStage] += dur
+							}
+							isClosed = true
+							stageStartTime = tr.TransitionedAt
+						}
+					} else {
+						// Reactivated!
+						if isClosed {
+							isClosed = false
+							stageStartTime = tr.TransitionedAt
+						}
 					}
-					isClosed = true
-					stageStartTime = tr.TransitionedAt
 				}
 			}
 

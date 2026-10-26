@@ -305,210 +305,263 @@ func TestEvaluateFlightDeck_StalenessRules(t *testing.T) {
 func TestEvaluateFlightDeck_UpcomingAndMissingDebriefs(t *testing.T) {
 	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 
-	input := domain.FlightDeckInput{
-		Now: now,
-		Opportunities: []domain.OpportunityView{
-			{
-				Opportunity: domain.Opportunity{
-					ID:        "opp-1",
-					RoleTitle: "Staff Engineer",
-					Stage:     domain.StageInterviewing,
-					Outcome:   domain.OutcomeActive,
+	tests := []struct {
+		name                string
+		input               domain.FlightDeckInput
+		wantUpcomingIDs     []string
+		wantMissingDebriefs []string
+		checkFirstUpcoming  func(t *testing.T, round domain.UpcomingInterviewRoundView)
+	}{
+		{
+			name: "filters upcoming rounds to next 48h and identifies past rounds missing debriefs",
+			input: domain.FlightDeckInput{
+				Now: now,
+				Opportunities: []domain.OpportunityView{
+					{
+						Opportunity: domain.Opportunity{
+							ID:        "opp-1",
+							RoleTitle: "Staff Engineer",
+							Stage:     domain.StageInterviewing,
+							Outcome:   domain.OutcomeActive,
+						},
+						CompanyName: "Stripe",
+					},
 				},
-				CompanyName: "Stripe",
-			},
-		},
-		InterviewRounds: []domain.InterviewRound{
-			// Round 1: in 12 hours (within 48h) -> upcoming!
-			{
-				ID:              "round-upcoming-12h",
-				OpportunityID:   "opp-1",
-				Title:           "Architecture Deep Dive",
-				RoundType:       domain.InterviewRoundTypeSystemDesign,
-				Status:          domain.InterviewRoundStatusScheduled,
-				ScheduledAt:     now.Add(12 * time.Hour),
-				DurationMinutes: 60,
-				ContactIDs:      []string{"contact-1"},
-				StoryIDs:        []string{"story-1"},
-			},
-			// Round 2: in 36 hours (within 48h) -> upcoming!
-			{
-				ID:              "round-upcoming-36h",
-				OpportunityID:   "opp-1",
-				Title:           "Values & Leadership",
-				RoundType:       domain.InterviewRoundTypeBehavioral,
-				Status:          domain.InterviewRoundStatusScheduled,
-				ScheduledAt:     now.Add(36 * time.Hour),
-				DurationMinutes: 45,
-			},
-			// Round 3: in 50 hours (> 48h) -> excluded from upcoming
-			{
-				ID:              "round-future-50h",
-				OpportunityID:   "opp-1",
-				Title:           "Executive Chat",
-				RoundType:       domain.InterviewRoundTypeExecutive,
-				Status:          domain.InterviewRoundStatusScheduled,
-				ScheduledAt:     now.Add(50 * time.Hour),
-				DurationMinutes: 30,
-			},
-			// Round 4: completed 2 hours ago without debrief -> missing debrief!
-			{
-				ID:              "round-missing-debrief-1",
-				OpportunityID:   "opp-1",
-				Title:           "Coding Round",
-				RoundType:       domain.InterviewRoundTypeTechnical,
-				Status:          domain.InterviewRoundStatusCompleted,
-				ScheduledAt:     now.Add(-2 * time.Hour),
-				DurationMinutes: 60,
-			},
-			// Round 5: scheduled 5 hours ago (past), still Scheduled, without debrief -> missing debrief!
-			{
-				ID:              "round-missing-debrief-2",
-				OpportunityID:   "opp-1",
-				Title:           "Recruiter Screen",
-				RoundType:       domain.InterviewRoundTypeRecruiterScreen,
-				Status:          domain.InterviewRoundStatusScheduled,
-				ScheduledAt:     now.Add(-5 * time.Hour),
-				DurationMinutes: 30,
-			},
-			// Round 6: completed 10 hours ago WITH debrief -> excluded from missing debriefs
-			{
-				ID:              "round-with-debrief",
-				OpportunityID:   "opp-1",
-				Title:           "HM Chat",
-				RoundType:       domain.InterviewRoundTypeHiringManager,
-				Status:          domain.InterviewRoundStatusCompleted,
-				ScheduledAt:     now.Add(-10 * time.Hour),
-				DurationMinutes: 45,
-				Debrief: &domain.Debrief{
-					WentWell:        "Great rapport",
-					Signals:         "Strong technical alignment",
-					ConfidenceScore: 4,
+				InterviewRounds: []domain.InterviewRound{
+					// Round 1: in 12 hours (within 48h) -> upcoming!
+					{
+						ID:              "round-upcoming-12h",
+						OpportunityID:   "opp-1",
+						Title:           "Architecture Deep Dive",
+						RoundType:       domain.InterviewRoundTypeSystemDesign,
+						Status:          domain.InterviewRoundStatusScheduled,
+						ScheduledAt:     now.Add(12 * time.Hour),
+						DurationMinutes: 60,
+						ContactIDs:      []string{"contact-1"},
+						StoryIDs:        []string{"story-1"},
+					},
+					// Round 2: in 36 hours (within 48h) -> upcoming!
+					{
+						ID:              "round-upcoming-36h",
+						OpportunityID:   "opp-1",
+						Title:           "Values & Leadership",
+						RoundType:       domain.InterviewRoundTypeBehavioral,
+						Status:          domain.InterviewRoundStatusScheduled,
+						ScheduledAt:     now.Add(36 * time.Hour),
+						DurationMinutes: 45,
+					},
+					// Round 3: in 50 hours (> 48h) -> excluded from upcoming
+					{
+						ID:              "round-future-50h",
+						OpportunityID:   "opp-1",
+						Title:           "Executive Chat",
+						RoundType:       domain.InterviewRoundTypeExecutive,
+						Status:          domain.InterviewRoundStatusScheduled,
+						ScheduledAt:     now.Add(50 * time.Hour),
+						DurationMinutes: 30,
+					},
+					// Round 4: completed 2 hours ago without debrief -> missing debrief!
+					{
+						ID:              "round-missing-debrief-1",
+						OpportunityID:   "opp-1",
+						Title:           "Coding Round",
+						RoundType:       domain.InterviewRoundTypeTechnical,
+						Status:          domain.InterviewRoundStatusCompleted,
+						ScheduledAt:     now.Add(-2 * time.Hour),
+						DurationMinutes: 60,
+					},
+					// Round 5: scheduled 5 hours ago (past), still Scheduled, without debrief -> missing debrief!
+					{
+						ID:              "round-missing-debrief-2",
+						OpportunityID:   "opp-1",
+						Title:           "Recruiter Screen",
+						RoundType:       domain.InterviewRoundTypeRecruiterScreen,
+						Status:          domain.InterviewRoundStatusScheduled,
+						ScheduledAt:     now.Add(-5 * time.Hour),
+						DurationMinutes: 30,
+					},
+					// Round 6: completed 10 hours ago WITH debrief -> excluded from missing debriefs
+					{
+						ID:              "round-with-debrief",
+						OpportunityID:   "opp-1",
+						Title:           "HM Chat",
+						RoundType:       domain.InterviewRoundTypeHiringManager,
+						Status:          domain.InterviewRoundStatusCompleted,
+						ScheduledAt:     now.Add(-10 * time.Hour),
+						DurationMinutes: 45,
+						Debrief: &domain.Debrief{
+							WentWell:        "Great rapport",
+							Signals:         "Strong technical alignment",
+							ConfidenceScore: 4,
+						},
+					},
+					// Round 7: cancelled round in past without debrief -> excluded
+					{
+						ID:              "round-cancelled",
+						OpportunityID:   "opp-1",
+						Title:           "Cancelled Screen",
+						RoundType:       domain.InterviewRoundTypeRecruiterScreen,
+						Status:          domain.InterviewRoundStatusCancelled,
+						ScheduledAt:     now.Add(-20 * time.Hour),
+						DurationMinutes: 30,
+					},
+				},
+				ContactNames: map[string]string{
+					"contact-1": "Alice Walker",
+				},
+				StoryTitles: map[string]string{
+					"story-1": "Scaling Payment Pipeline to 10k RPS",
 				},
 			},
-			// Round 7: cancelled round in past without debrief -> excluded
-			{
-				ID:              "round-cancelled",
-				OpportunityID:   "opp-1",
-				Title:           "Cancelled Screen",
-				RoundType:       domain.InterviewRoundTypeRecruiterScreen,
-				Status:          domain.InterviewRoundStatusCancelled,
-				ScheduledAt:     now.Add(-20 * time.Hour),
-				DurationMinutes: 30,
+			wantUpcomingIDs:     []string{"round-upcoming-12h", "round-upcoming-36h"},
+			wantMissingDebriefs: []string{"round-missing-debrief-1", "round-missing-debrief-2"},
+			checkFirstUpcoming: func(t *testing.T, round domain.UpcomingInterviewRoundView) {
+				if round.CompanyName != "Stripe" {
+					t.Errorf("expected company Stripe, got %s", round.CompanyName)
+				}
+				if len(round.InterviewerNames) != 1 || round.InterviewerNames[0] != "Alice Walker" {
+					t.Errorf("expected interviewer Alice Walker, got %v", round.InterviewerNames)
+				}
+				if len(round.StoryTitles) != 1 || round.StoryTitles[0] != "Scaling Payment Pipeline to 10k RPS" {
+					t.Errorf("expected story title, got %v", round.StoryTitles)
+				}
 			},
 		},
-		ContactNames: map[string]string{
-			"contact-1": "Alice Walker",
-		},
-		StoryTitles: map[string]string{
-			"story-1": "Scaling Payment Pipeline to 10k RPS",
-		},
 	}
 
-	fd := domain.EvaluateFlightDeck(input)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fd := domain.EvaluateFlightDeck(tc.input)
 
-	// Verify Upcoming Rounds
-	if len(fd.UpcomingRounds) != 2 {
-		t.Fatalf("expected 2 upcoming rounds within 48h, got %d", len(fd.UpcomingRounds))
-	}
-	if fd.UpcomingRounds[0].Round.ID != "round-upcoming-12h" {
-		t.Errorf("expected first upcoming round round-upcoming-12h, got %s", fd.UpcomingRounds[0].Round.ID)
-	}
-	if fd.UpcomingRounds[0].CompanyName != "Stripe" {
-		t.Errorf("expected company Stripe, got %s", fd.UpcomingRounds[0].CompanyName)
-	}
-	if len(fd.UpcomingRounds[0].InterviewerNames) != 1 || fd.UpcomingRounds[0].InterviewerNames[0] != "Alice Walker" {
-		t.Errorf("expected interviewer Alice Walker, got %v", fd.UpcomingRounds[0].InterviewerNames)
-	}
-	if len(fd.UpcomingRounds[0].StoryTitles) != 1 || fd.UpcomingRounds[0].StoryTitles[0] != "Scaling Payment Pipeline to 10k RPS" {
-		t.Errorf("expected story title, got %v", fd.UpcomingRounds[0].StoryTitles)
-	}
-	if fd.UpcomingRounds[1].Round.ID != "round-upcoming-36h" {
-		t.Errorf("expected second upcoming round round-upcoming-36h, got %s", fd.UpcomingRounds[1].Round.ID)
-	}
+			if len(fd.UpcomingRounds) != len(tc.wantUpcomingIDs) {
+				t.Fatalf("expected %d upcoming rounds, got %d", len(tc.wantUpcomingIDs), len(fd.UpcomingRounds))
+			}
+			for i, wantID := range tc.wantUpcomingIDs {
+				if fd.UpcomingRounds[i].Round.ID != wantID {
+					t.Errorf("upcoming[%d]: expected %s, got %s", i, wantID, fd.UpcomingRounds[i].Round.ID)
+				}
+			}
+			if tc.checkFirstUpcoming != nil && len(fd.UpcomingRounds) > 0 {
+				tc.checkFirstUpcoming(t, fd.UpcomingRounds[0])
+			}
 
-	// Verify Missing Debriefs
-	if len(fd.MissingDebriefs) != 2 {
-		t.Fatalf("expected 2 missing debrief rounds, got %d", len(fd.MissingDebriefs))
-	}
-	// Missing debriefs ordered by most recent first (-2h before -5h)
-	if fd.MissingDebriefs[0].Round.ID != "round-missing-debrief-1" {
-		t.Errorf("expected most recent missing debrief first, got %s", fd.MissingDebriefs[0].Round.ID)
-	}
-	if fd.MissingDebriefs[1].Round.ID != "round-missing-debrief-2" {
-		t.Errorf("expected second missing debrief, got %s", fd.MissingDebriefs[1].Round.ID)
+			if len(fd.MissingDebriefs) != len(tc.wantMissingDebriefs) {
+				t.Fatalf("expected %d missing debriefs, got %d", len(tc.wantMissingDebriefs), len(fd.MissingDebriefs))
+			}
+			for i, wantID := range tc.wantMissingDebriefs {
+				if fd.MissingDebriefs[i].Round.ID != wantID {
+					t.Errorf("missing debrief[%d]: expected %s, got %s", i, wantID, fd.MissingDebriefs[i].Round.ID)
+				}
+			}
+		})
 	}
 }
 
 func TestEvaluateFlightDeck_ActionItems(t *testing.T) {
 	now := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 
-	input := domain.FlightDeckInput{
-		Now: now,
-		ActionItems: []domain.ActionItemView{
-			{
-				ActionItem: domain.ActionItem{
-					ID:     "item-due-future",
-					Title:  "Prep notes for tomorrow",
-					DueAt:  now.Add(24 * time.Hour),
-					Status: domain.ActionItemStatusOpen,
+	type expectedItem struct {
+		id         string
+		isOverdue  bool
+		isDueToday bool
+	}
+
+	tests := []struct {
+		name      string
+		input     domain.FlightDeckInput
+		wantItems []expectedItem
+	}{
+		{
+			name: "orders open action items by due date with mutually exclusive is_overdue and is_due_today flags",
+			input: domain.FlightDeckInput{
+				Now: now,
+				ActionItems: []domain.ActionItemView{
+					{
+						ActionItem: domain.ActionItem{
+							ID:     "item-due-future",
+							Title:  "Prep notes for tomorrow",
+							DueAt:  now.Add(24 * time.Hour), // Tomorrow (2026-10-27)
+							Status: domain.ActionItemStatusOpen,
+						},
+						CompanyName: "Acme",
+					},
+					{
+						ActionItem: domain.ActionItem{
+							ID:     "item-overdue",
+							Title:  "Send thank you note",
+							DueAt:  now.Add(-36 * time.Hour), // Strictly before start of today (2026-10-25 00:00)
+							Status: domain.ActionItemStatusOpen,
+						},
+						CompanyName: "Beta",
+					},
+					{
+						ActionItem: domain.ActionItem{
+							ID:     "item-due-today",
+							Title:  "Review system design doc",
+							DueAt:  time.Date(2026, 10, 26, 18, 0, 0, 0, time.UTC), // Today at 18:00
+							Status: domain.ActionItemStatusOpen,
+						},
+						CompanyName: "Gamma",
+					},
+					{
+						ActionItem: domain.ActionItem{
+							ID:     "item-completed",
+							Title:  "Already done item",
+							DueAt:  now.Add(-48 * time.Hour),
+							Status: domain.ActionItemStatusCompleted, // Not open
+						},
+					},
 				},
-				CompanyName: "Acme",
 			},
-			{
-				ActionItem: domain.ActionItem{
-					ID:     "item-overdue",
-					Title:  "Send thank you note",
-					DueAt:  now.Add(-2 * time.Hour), // overdue
-					Status: domain.ActionItemStatusOpen,
-				},
-				CompanyName: "Beta",
+			wantItems: []expectedItem{
+				{id: "item-overdue", isOverdue: true, isDueToday: false},
+				{id: "item-due-today", isOverdue: false, isDueToday: true},
+				{id: "item-due-future", isOverdue: false, isDueToday: false},
 			},
-			{
-				ActionItem: domain.ActionItem{
-					ID:     "item-due-today",
-					Title:  "Review system design doc",
-					DueAt:  time.Date(2026, 10, 26, 18, 0, 0, 0, time.UTC), // today at 18:00
-					Status: domain.ActionItemStatusOpen,
+		},
+		{
+			name: "same-day past timestamp is marked is_due_today and never is_overdue",
+			input: domain.FlightDeckInput{
+				Now: now, // 2026-10-26 12:00:00 UTC
+				ActionItems: []domain.ActionItemView{
+					{
+						ActionItem: domain.ActionItem{
+							ID:     "item-earlier-today",
+							Title:  "Morning standup notes",
+							DueAt:  time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC), // earlier same calendar day
+							Status: domain.ActionItemStatusOpen,
+						},
+					},
 				},
-				CompanyName: "Gamma",
 			},
-			{
-				ActionItem: domain.ActionItem{
-					ID:     "item-completed",
-					Title:  "Already done item",
-					DueAt:  now.Add(-48 * time.Hour),
-					Status: domain.ActionItemStatusCompleted, // Not open
-				},
+			wantItems: []expectedItem{
+				{id: "item-earlier-today", isOverdue: false, isDueToday: true},
 			},
 		},
 	}
 
-	fd := domain.EvaluateFlightDeck(input)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fd := domain.EvaluateFlightDeck(tc.input)
 
-	if len(fd.ActionItems) != 3 {
-		t.Fatalf("expected 3 open action items, got %d", len(fd.ActionItems))
-	}
-
-	// Should be ordered by DueAt ASC: overdue (-2h) < due today (18:00) < future (+24h)
-	if fd.ActionItems[0].ActionItem.ID != "item-overdue" {
-		t.Errorf("expected first item to be item-overdue, got %s", fd.ActionItems[0].ActionItem.ID)
-	}
-	if !fd.ActionItems[0].IsOverdue {
-		t.Errorf("expected item-overdue to have IsOverdue = true")
-	}
-
-	if fd.ActionItems[1].ActionItem.ID != "item-due-today" {
-		t.Errorf("expected second item to be item-due-today, got %s", fd.ActionItems[1].ActionItem.ID)
-	}
-	if !fd.ActionItems[1].IsDueToday {
-		t.Errorf("expected item-due-today to have IsDueToday = true")
-	}
-
-	if fd.ActionItems[2].ActionItem.ID != "item-due-future" {
-		t.Errorf("expected third item to be item-due-future, got %s", fd.ActionItems[2].ActionItem.ID)
-	}
-	if fd.ActionItems[2].IsOverdue || fd.ActionItems[2].IsDueToday {
-		t.Errorf("expected future item to not be overdue or due today")
+			if len(fd.ActionItems) != len(tc.wantItems) {
+				t.Fatalf("expected %d open action items, got %d", len(tc.wantItems), len(fd.ActionItems))
+			}
+			for i, want := range tc.wantItems {
+				got := fd.ActionItems[i]
+				if got.ActionItem.ID != want.id {
+					t.Errorf("item[%d]: expected ID %s, got %s", i, want.id, got.ActionItem.ID)
+				}
+				if got.IsOverdue != want.isOverdue {
+					t.Errorf("item[%s]: IsOverdue = %v, want %v", want.id, got.IsOverdue, want.isOverdue)
+				}
+				if got.IsDueToday != want.isDueToday {
+					t.Errorf("item[%s]: IsDueToday = %v, want %v", want.id, got.IsDueToday, want.isDueToday)
+				}
+				if got.IsOverdue && got.IsDueToday {
+					t.Errorf("item[%s]: IsOverdue and IsDueToday must be mutually exclusive", want.id)
+				}
+			}
+		})
 	}
 }

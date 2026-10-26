@@ -282,14 +282,19 @@ func EvaluateFlightDeck(in FlightDeckInput) FlightDeck {
 	})
 
 	// 8. Open Action Items ordered by due date (highlighting overdue and due-today items)
+	todayStartUTC := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	actionItems := []FlightDeckActionItemView{}
 	for _, av := range in.ActionItems {
 		if av.ActionItem.Status != ActionItemStatusOpen {
 			continue
 		}
 		dueUTC := av.ActionItem.DueAt.UTC()
-		isOverdue := dueUTC.Before(now)
-		isDueToday := isSameDay(dueUTC, now)
+		var isOverdue, isDueToday bool
+		if isSameDay(dueUTC, now) {
+			isDueToday = true
+		} else if dueUTC.Before(todayStartUTC) {
+			isOverdue = true
+		}
 
 		actionItems = append(actionItems, FlightDeckActionItemView{
 			ActionItemView: av,

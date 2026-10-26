@@ -99,7 +99,6 @@ func (g *HTTPAssistantGateway) ExtractJobPosting(ctx context.Context, settings d
 		model = defaultFastModelForProvider(settings.Provider)
 	}
 
-	endpoint := resolveChatCompletionsEndpoint(settings)
 	systemPrompt := `You are a structured job posting extractor for a software engineering Job Search Cockpit.
 Return ONLY valid JSON with fields:
 {
@@ -129,53 +128,11 @@ Return ONLY valid JSON with fields:
 		in.RawText,
 	)
 
-	reqBody := map[string]any{
-		"model": model,
-		"messages": []map[string]string{
-			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": userPrompt},
-		},
-		"temperature": 0.1,
-	}
-
-	bodyBytes, err := json.Marshal(reqBody)
+	content, usedModel, err := g.completeChatJSON(ctx, settings, model, systemPrompt, userPrompt, 0.1)
 	if err != nil {
-		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("encode llm request: %w", err)
+		return domain.ExtractedJobPostingDraft{}, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("%w: build request: %v", domain.ErrAssistantUnavailable, err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if strings.TrimSpace(settings.APIKey) != "" {
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(settings.APIKey))
-	}
-
-	resp, err := g.client.Do(req)
-	if err != nil {
-		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("%w: llm request failed: %v", domain.ErrAssistantUnavailable, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("%w: status %d: %s", domain.ErrAssistantUnavailable, resp.StatusCode, strings.TrimSpace(string(msg)))
-	}
-
-	var chatResp struct {
-		Model   string `json:"model"`
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil || len(chatResp.Choices) == 0 {
-		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("%w: invalid llm response payload", domain.ErrAssistantUnavailable)
-	}
-
-	content := cleanJSONFence(chatResp.Choices[0].Message.Content)
 	var parsed struct {
 		CompanyName   string   `json:"company_name"`
 		CompanyDomain string   `json:"company_domain"`
@@ -191,11 +148,6 @@ Return ONLY valid JSON with fields:
 	}
 	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 		return domain.ExtractedJobPostingDraft{}, fmt.Errorf("%w: failed to parse structured llm json: %v", domain.ErrAssistantUnavailable, err)
-	}
-
-	usedModel := strings.TrimSpace(chatResp.Model)
-	if usedModel == "" {
-		usedModel = model
 	}
 
 	return domain.ExtractedJobPostingDraft{
@@ -444,19 +396,32 @@ func buildArtifactDraftPrompt(in domain.AssistantDraftArtifactInput) string {
 	return sb.String()
 }
 
+var defaultReasoningModels = map[domain.AIProvider]string{
+	domain.AIProviderOpenAI:    "gpt-4o",
+	domain.AIProviderAnthropic: "claude-3-7-sonnet-latest",
+	domain.AIProviderGemini:    "gemini-2.5-pro",
+	domain.AIProviderOllama:    "llama3.2:latest",
+}
+
+var defaultFastModels = map[domain.AIProvider]string{
+	domain.AIProviderOpenAI:    "gpt-4o-mini",
+	domain.AIProviderAnthropic: "claude-3-5-haiku-latest",
+	domain.AIProviderGemini:    "gemini-2.5-flash",
+	domain.AIProviderOllama:    "llama3.2:latest",
+}
+
+var defaultChatEndpoints = map[domain.AIProvider]string{
+	domain.AIProviderOpenAI:    "https://api.openai.com/v1/chat/completions",
+	domain.AIProviderAnthropic: "https://api.anthropic.com/v1/chat/completions",
+	domain.AIProviderGemini:    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+	domain.AIProviderOllama:    "http://localhost:11434/v1/chat/completions",
+}
+
 func defaultReasoningModelForProvider(p domain.AIProvider) string {
-	switch p {
-	case domain.AIProviderOpenAI:
-		return "gpt-4o"
-	case domain.AIProviderAnthropic:
-		return "claude-3-7-sonnet-latest"
-	case domain.AIProviderGemini:
-		return "gemini-2.5-pro"
-	case domain.AIProviderOllama:
-		return "llama3.2:latest"
-	default:
-		return "anthropic/claude-3.7-sonnet"
+	if m, ok := defaultReasoningModels[p]; ok {
+		return m
 	}
+	return "anthropic/claude-3.7-sonnet"
 }
 
 func resolveChatCompletionsEndpoint(settings domain.AISettings) string {
@@ -467,33 +432,17 @@ func resolveChatCompletionsEndpoint(settings domain.AISettings) string {
 		}
 		return base + "/chat/completions"
 	}
-	switch settings.Provider {
-	case domain.AIProviderOpenAI:
-		return "https://api.openai.com/v1/chat/completions"
-	case domain.AIProviderAnthropic:
-		return "https://api.anthropic.com/v1/chat/completions"
-	case domain.AIProviderGemini:
-		return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-	case domain.AIProviderOllama:
-		return "http://localhost:11434/v1/chat/completions"
-	default:
-		return "https://openrouter.ai/api/v1/chat/completions"
+	if ep, ok := defaultChatEndpoints[settings.Provider]; ok {
+		return ep
 	}
+	return "https://openrouter.ai/api/v1/chat/completions"
 }
 
 func defaultFastModelForProvider(p domain.AIProvider) string {
-	switch p {
-	case domain.AIProviderOpenAI:
-		return "gpt-4o-mini"
-	case domain.AIProviderAnthropic:
-		return "claude-3-5-haiku-latest"
-	case domain.AIProviderGemini:
-		return "gemini-2.5-flash"
-	case domain.AIProviderOllama:
-		return "llama3.2:latest"
-	default:
-		return "anthropic/claude-3.5-haiku"
+	if m, ok := defaultFastModels[p]; ok {
+		return m
 	}
+	return "anthropic/claude-3.5-haiku"
 }
 
 func cleanJSONFence(raw string) string {

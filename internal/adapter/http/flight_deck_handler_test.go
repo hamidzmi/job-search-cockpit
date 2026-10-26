@@ -50,7 +50,7 @@ func TestFlightDeckAPI(t *testing.T) {
 	doJSON(t, srv, http.MethodPost, "/api/action-items", map[string]any{
 		"title":          "Overdue action",
 		"opportunity_id": opp.ID,
-		"due_at":         t0.Add(-5 * time.Hour).Format(time.RFC3339),
+		"due_at":         t0.Add(-24 * time.Hour).Format(time.RFC3339),
 	})
 	doJSON(t, srv, http.MethodPost, "/api/action-items", map[string]any{
 		"title":          "Due today action",

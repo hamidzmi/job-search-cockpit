@@ -23,6 +23,10 @@ type dbExecutor interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
+type scanner interface {
+	Scan(dest ...any) error
+}
+
 type Store struct {
 	db *sql.DB
 }

@@ -19,7 +19,6 @@ func NewBackupHandler(backup inbound.BackupUseCase) *BackupHandler {
 
 func (h *BackupHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/backup/export", h.handleExportBackup)
-	mux.HandleFunc("POST /api/backup/export", h.handleExportBackup)
 }
 
 func (h *BackupHandler) handleExportBackup(w http.ResponseWriter, r *http.Request) {
