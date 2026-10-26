@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import { type ActionItemApi, defaultActionItemApi } from './actionItemApi';
+import { type AISettingsApi, defaultAISettingsApi } from './aiSettingsApi';
 import { type CompanyApi, defaultCompanyApi } from './companyApi';
 import { type ContactApi, defaultContactApi } from './contactApi';
 import { type InteractionApi, defaultInteractionApi } from './interactionApi';
@@ -9,11 +10,14 @@ import {
 } from './interviewRoundApi';
 import { type OpportunityApi, defaultOpportunityApi } from './opportunityApi';
 import { type ProfileApi, defaultProfileApi } from './profileApi';
+import { type QuickCaptureApi, defaultQuickCaptureApi } from './quickCaptureApi';
 import { type StoryApi, defaultStoryApi } from './storyApi';
 
 export interface CockpitApi {
   companies: CompanyApi;
   opportunities: OpportunityApi;
+  aiSettings: AISettingsApi;
+  quickCapture: QuickCaptureApi;
   profile: ProfileApi;
   stories: StoryApi;
   contacts: ContactApi;
@@ -25,6 +29,8 @@ export interface CockpitApi {
 const defaultCockpitApi: CockpitApi = {
   companies: defaultCompanyApi,
   opportunities: defaultOpportunityApi,
+  aiSettings: defaultAISettingsApi,
+  quickCapture: defaultQuickCaptureApi,
   profile: defaultProfileApi,
   stories: defaultStoryApi,
   contacts: defaultContactApi,

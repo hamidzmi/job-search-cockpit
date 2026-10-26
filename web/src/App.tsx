@@ -7,9 +7,9 @@ import { PipelineWorkspace } from './features/pipeline/PipelineWorkspace';
 import {
   AnalyticsWorkspace,
   FlightDeckWorkspace,
-  SettingsWorkspace,
 } from './features/placeholders/WorkspacePlaceholders';
 import { ProfileWorkspace } from './features/profile/ProfileWorkspace';
+import { SettingsWorkspace } from './features/settings/SettingsWorkspace';
 
 export function AppRoutes() {
   return (
