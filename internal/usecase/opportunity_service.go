@@ -136,10 +136,3 @@ func (s *OpportunityService) TransitionOpportunity(ctx context.Context, id strin
 	}
 	return updated, nil
 }
-
-func (s *OpportunityService) ListStageTransitions(ctx context.Context, opportunityID string) ([]domain.StageTransition, error) {
-	if _, err := s.opps.GetOpportunity(ctx, opportunityID); err != nil {
-		return nil, err
-	}
-	return s.transitions.ListStageTransitions(ctx, opportunityID)
-}

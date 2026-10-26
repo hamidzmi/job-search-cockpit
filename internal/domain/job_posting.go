@@ -43,10 +43,6 @@ func normalizeJobPosting(jp JobPosting) (JobPosting, error) {
 			tags = append(tags, trimmed)
 		}
 	}
-	currency := strings.TrimSpace(jp.Currency)
-	if currency == "" && (jp.StatedMinComp > 0 || jp.StatedMaxComp > 0) {
-		currency = "USD"
-	}
 	return JobPosting{
 		SourceURL:     strings.TrimSpace(jp.SourceURL),
 		RawText:       strings.TrimSpace(jp.RawText),
@@ -54,6 +50,6 @@ func normalizeJobPosting(jp JobPosting) (JobPosting, error) {
 		TechStackTags: tags,
 		StatedMinComp: jp.StatedMinComp,
 		StatedMaxComp: jp.StatedMaxComp,
-		Currency:      currency,
+		Currency:      strings.TrimSpace(jp.Currency),
 	}, nil
 }

@@ -11,6 +11,7 @@ import (
 type ErrorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 type ErrorEnvelope struct {
@@ -36,6 +37,14 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, ErrorEnvelope{
 			Error: ErrorBody{Code: "not_found", Message: err.Error()},
+		})
+	case errors.Is(err, domain.ErrConflict):
+		writeJSON(w, http.StatusConflict, ErrorEnvelope{
+			Error: ErrorBody{Code: "conflict", Message: err.Error()},
+		})
+	case errors.Is(err, domain.ErrAssistantUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope{
+			Error: ErrorBody{Code: "assistant_unavailable", Message: err.Error()},
 		})
 	default:
 		writeJSON(w, http.StatusInternalServerError, ErrorEnvelope{

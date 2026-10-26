@@ -22,7 +22,6 @@ func (h *OpportunityHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/opportunities/{id}", h.handleGetOpportunity)
 	mux.HandleFunc("PUT /api/opportunities/{id}", h.handleUpdateOpportunity)
 	mux.HandleFunc("POST /api/opportunities/{id}/transition", h.handleTransitionOpportunity)
-	mux.HandleFunc("GET /api/opportunities/{id}/transitions", h.handleListStageTransitions)
 }
 
 func (h *OpportunityHandler) handleListOpportunities(w http.ResponseWriter, r *http.Request) {
@@ -102,17 +101,4 @@ func (h *OpportunityHandler) handleTransitionOpportunity(w http.ResponseWriter, 
 		return
 	}
 	writeJSON(w, http.StatusOK, toOpportunityDTO(opp, nil))
-}
-
-func (h *OpportunityHandler) handleListStageTransitions(w http.ResponseWriter, r *http.Request) {
-	transitions, err := h.opportunities.ListStageTransitions(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeDomainError(w, err)
-		return
-	}
-	dtos := make([]StageTransitionDTO, 0, len(transitions))
-	for _, tr := range transitions {
-		dtos = append(dtos, toStageTransitionDTO(tr))
-	}
-	writeJSON(w, http.StatusOK, dtos)
 }

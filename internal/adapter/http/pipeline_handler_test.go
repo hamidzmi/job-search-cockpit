@@ -339,15 +339,16 @@ func TestOpportunitiesAPI_LifecycleAndTransitions(t *testing.T) {
 		})
 	}
 
-	t.Run("returns full chronological StageTransition history on opportunity detail and transitions endpoint", func(t *testing.T) {
-		rec := doJSON(t, srv, http.MethodGet, "/api/opportunities/"+firstOppID+"/transitions", nil)
+	t.Run("returns full chronological StageTransition history on opportunity detail endpoint", func(t *testing.T) {
+		rec := doJSON(t, srv, http.MethodGet, "/api/opportunities/"+firstOppID, nil)
 		if rec.Code != http.StatusOK {
-			t.Fatalf("expected 200 OK on GET transitions, got %d", rec.Code)
+			t.Fatalf("expected 200 OK on GET opportunity, got %d", rec.Code)
 		}
-		var history []httpadapter.StageTransitionDTO
-		if err := json.Unmarshal(rec.Body.Bytes(), &history); err != nil {
-			t.Fatalf("decode transitions failed: %v", err)
+		var detail httpadapter.OpportunityDTO
+		if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
+			t.Fatalf("decode opportunity detail failed: %v", err)
 		}
+		history := detail.StageTransitions
 		if len(history) != 4 {
 			t.Fatalf("expected 4 transitions (1 initial + 3 changes), got %d: %+v", len(history), history)
 		}
