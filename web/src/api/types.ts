@@ -672,3 +672,72 @@ export interface ArtifactDraft {
   content_markdown: string;
   model_used: string;
 }
+
+export interface UpcomingInterviewRound {
+  id: string;
+  opportunity_id: string;
+  company_name: string;
+  opportunity_role_title: string;
+  round_order: number;
+  round_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: string;
+  prep_notes: string;
+  contact_ids: string[];
+  story_ids: string[];
+  interviewer_names: string[];
+  story_titles: string[];
+}
+
+export interface MissingDebriefRound {
+  id: string;
+  opportunity_id: string;
+  company_name: string;
+  opportunity_role_title: string;
+  round_order: number;
+  round_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: string;
+}
+
+export interface FlightDeckActionItem {
+  id: string;
+  title: string;
+  opportunity_id?: string;
+  opportunity_role_title?: string;
+  contact_id?: string;
+  contact_name?: string;
+  company_name?: string;
+  due_at: string;
+  status: 'open' | 'completed' | 'dismissed';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  is_overdue: boolean;
+  is_due_today: boolean;
+}
+
+export interface StaleOpportunity {
+  opportunity_id: string;
+  company_id: string;
+  company_name: string;
+  role_title: string;
+  stage: Stage;
+  outcome: Outcome;
+  priority: Priority;
+  stale_reason: string;
+  days_stale: number;
+  anchor_date: string;
+  last_activity_at: string;
+}
+
+export interface FlightDeckData {
+  upcoming_rounds: UpcomingInterviewRound[];
+  missing_debriefs: MissingDebriefRound[];
+  action_items: FlightDeckActionItem[];
+  stale_opportunities: StaleOpportunity[];
+}
