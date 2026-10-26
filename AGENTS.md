@@ -1,5 +1,11 @@
 ## Agent skills
 
+Repo root: `/Users/hamid/Projects/Job-Search-Cockpit`.
+
+### Coding standards
+
+Clean Architecture layer rules, single-responsibility file & port layout, `internal/app` composition root, table-driven tests, and UTC/local timestamp rules. See `CODING_STANDARDS.md`.
+
 ### Issue tracker
 
 Issues and specs are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.

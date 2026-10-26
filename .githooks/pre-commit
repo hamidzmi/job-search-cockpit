@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-commit] Running go vet & go test -race..."
+go vet ./...
+go test -race ./...
+
+if [ -f "web/package.json" ]; then
+  echo "[pre-commit] Running frontend typecheck/build & tests..."
+  npm --prefix web test
+  npm --prefix web run build
+fi
