@@ -393,7 +393,6 @@ func TestOpportunitiesAPI_Filtering(t *testing.T) {
 			"priority":      "Low",
 			"remote_policy": "Hybrid",
 			"stage":         "Screening",
-			"outcome":       "Ghosted",
 		},
 		{
 			"company_id":    compCloudflare,
@@ -401,17 +400,29 @@ func TestOpportunitiesAPI_Filtering(t *testing.T) {
 			"priority":      "High",
 			"remote_policy": "Remote",
 			"stage":         "Offer",
-			"outcome":       "Active",
 			"notes":         "Workers runtime V8 isolates",
 		},
 	}
 
+	var seededIDs []string
 	for _, payload := range seedOpps {
 		clock.now = clock.now.Add(time.Minute)
 		rec := doJSON(t, srv, http.MethodPost, "/api/opportunities", payload)
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("seed opportunity failed: %d %s", rec.Code, rec.Body.String())
 		}
+		var created httpadapter.OpportunityDTO
+		_ = json.Unmarshal(rec.Body.Bytes(), &created)
+		seededIDs = append(seededIDs, created.ID)
+	}
+
+	// Transition Senior Storage Engineer to Ghosted
+	trRec := doJSON(t, srv, http.MethodPost, "/api/opportunities/"+seededIDs[1]+"/transition", map[string]any{
+		"outcome": "Ghosted",
+		"note":    "No response after screening",
+	})
+	if trRec.Code != http.StatusOK {
+		t.Fatalf("seed transition failed: %d %s", trRec.Code, trRec.Body.String())
 	}
 
 	filterCases := []struct {

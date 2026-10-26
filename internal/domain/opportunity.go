@@ -37,7 +37,6 @@ type OpportunityDetailsInput struct {
 type OpportunityInput struct {
 	OpportunityDetailsInput
 	Stage          Stage
-	Outcome        Outcome
 	TransitionNote string
 }
 
@@ -56,9 +55,6 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 	if strings.TrimSpace(id) == "" {
 		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: opportunity id is required", ErrValidation)
 	}
-	if strings.TrimSpace(transitionID) == "" {
-		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: transition id is required", ErrValidation)
-	}
 	companyID := strings.TrimSpace(in.CompanyID)
 	if companyID == "" {
 		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: company id is required", ErrValidation)
@@ -71,17 +67,6 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 	stage := in.Stage
 	if stage == "" {
 		stage = StageDiscovered
-	}
-	if !stage.IsValid() {
-		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: invalid stage %q", ErrValidation, stage)
-	}
-
-	outcome := in.Outcome
-	if outcome == "" {
-		outcome = OutcomeActive
-	}
-	if !outcome.IsValid() {
-		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: invalid outcome %q", ErrValidation, outcome)
 	}
 
 	jp, err := normalizeJobPosting(in.JobPosting)
@@ -104,31 +89,21 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 
 	ts := now.UTC()
 	opp := Opportunity{
-		ID:             strings.TrimSpace(id),
-		CompanyID:      companyID,
-		RoleTitle:      roleTitle,
-		Seniority:      strings.TrimSpace(in.Seniority),
-		Location:       strings.TrimSpace(in.Location),
-		RemotePolicy:   remotePolicy,
-		Priority:       priority,
-		Stage:          stage,
-		Outcome:        outcome,
-		Notes:          strings.TrimSpace(in.Notes),
-		JobPosting:     jp,
-		LastActivityAt: ts,
-		CreatedAt:      ts,
-		UpdatedAt:      ts,
+		ID:           strings.TrimSpace(id),
+		CompanyID:    companyID,
+		RoleTitle:    roleTitle,
+		Seniority:    strings.TrimSpace(in.Seniority),
+		Location:     strings.TrimSpace(in.Location),
+		RemotePolicy: remotePolicy,
+		Priority:     priority,
+		Notes:        strings.TrimSpace(in.Notes),
+		JobPosting:   jp,
+		CreatedAt:    ts,
 	}
 
-	tr := StageTransition{
-		ID:             strings.TrimSpace(transitionID),
-		OpportunityID:  opp.ID,
-		FromStage:      "",
-		ToStage:        stage,
-		FromOutcome:    "",
-		ToOutcome:      outcome,
-		Note:           strings.TrimSpace(in.TransitionNote),
-		TransitionedAt: ts,
+	tr, err := opp.Transition(transitionID, stage, OutcomeActive, in.TransitionNote, ts)
+	if err != nil {
+		return Opportunity{}, StageTransition{}, err
 	}
 
 	return opp, tr, nil

@@ -96,7 +96,6 @@ func (r OpportunityUpdateRequest) toDomainInput() domain.OpportunityDetailsInput
 type OpportunityCreateRequest struct {
 	OpportunityUpdateRequest
 	Stage          string `json:"stage"`
-	Outcome        string `json:"outcome"`
 	TransitionNote string `json:"transition_note"`
 	Note           string `json:"note"`
 }
@@ -109,7 +108,6 @@ func (r OpportunityCreateRequest) toDomainInput() domain.OpportunityInput {
 	return domain.OpportunityInput{
 		OpportunityDetailsInput: r.OpportunityUpdateRequest.toDomainInput(),
 		Stage:                   domain.Stage(r.Stage),
-		Outcome:                 domain.Outcome(r.Outcome),
 		TransitionNote:          transitionNote,
 	}
 }

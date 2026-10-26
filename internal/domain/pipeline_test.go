@@ -119,8 +119,7 @@ func TestNewOpportunity(t *testing.T) {
 						Currency:      "USD",
 					},
 				},
-				Stage:   domain.StageApplied,
-				Outcome: domain.OutcomeActive,
+				Stage: domain.StageApplied,
 			},
 			wantStage:      domain.StageApplied,
 			wantOutcome:    domain.OutcomeActive,
@@ -159,19 +158,6 @@ func TestNewOpportunity(t *testing.T) {
 					RoleTitle: "Engineer",
 				},
 				Stage: domain.Stage("PhoneScreen"),
-			},
-			wantErr: domain.ErrValidation,
-		},
-		{
-			name:         "rejects non-canonical outcome",
-			id:           "opp-6",
-			transitionID: "tr-6",
-			input: domain.OpportunityInput{
-				OpportunityDetailsInput: domain.OpportunityDetailsInput{
-					CompanyID: "comp-1",
-					RoleTitle: "Engineer",
-				},
-				Outcome: domain.Outcome("Archived"),
 			},
 			wantErr: domain.ErrValidation,
 		},
@@ -334,8 +320,7 @@ func TestOpportunity_Transition(t *testing.T) {
 					CompanyID: "comp-1",
 					RoleTitle: "Staff Engineer",
 				},
-				Stage:   tc.initialStage,
-				Outcome: tc.initialOutcome,
+				Stage: tc.initialStage,
 			}, createdAt)
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
