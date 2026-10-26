@@ -8,6 +8,7 @@ import { type OpportunityApi, defaultOpportunityApi } from './opportunityApi';
 import { type ProfileApi, defaultProfileApi } from './profileApi';
 import { type QuickCaptureApi, defaultQuickCaptureApi } from './quickCaptureApi';
 import { type StoryApi, defaultStoryApi } from './storyApi';
+import { type TailoringApi, defaultTailoringApi } from './tailoringApi';
 
 export interface CockpitApi {
   companies: CompanyApi;
@@ -19,6 +20,7 @@ export interface CockpitApi {
   contacts: ContactApi;
   interactions: InteractionApi;
   actionItems: ActionItemApi;
+  tailoring: TailoringApi;
 }
 
 const defaultCockpitApi: CockpitApi = {
@@ -31,6 +33,7 @@ const defaultCockpitApi: CockpitApi = {
   contacts: defaultContactApi,
   interactions: defaultInteractionApi,
   actionItems: defaultActionItemApi,
+  tailoring: defaultTailoringApi,
 };
 
 const CockpitApiContext = createContext<CockpitApi>(defaultCockpitApi);

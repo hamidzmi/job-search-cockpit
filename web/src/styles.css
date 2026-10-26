@@ -476,3 +476,70 @@ body {
   clip: rect(0, 0, 0, 0);
   border: 0;
 }
+
+.ats-print-sheet {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #111827;
+  line-height: 1.45;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+.ats-print-sheet h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 0.35rem;
+}
+
+.ats-print-sheet h2 {
+  margin: 1rem 0 0.35rem;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ats-print-sheet h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.ats-print-sheet p {
+  margin: 0.35rem 0;
+  font-size: 0.92rem;
+}
+
+.ats-list {
+  margin: 0.35rem 0 0.65rem 1.25rem;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+@media print {
+  .cockpit-sidebar,
+  .workspace-header,
+  .ats-no-print {
+    display: none !important;
+  }
+
+  .modal-backdrop.ats-print-backdrop {
+    position: static;
+    background: transparent;
+    padding: 0;
+  }
+
+  .modal-card.ats-print-modal {
+    max-width: 100%;
+    max-height: none;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .ats-print-sheet {
+    border: none;
+    padding: 0;
+  }
+}
+

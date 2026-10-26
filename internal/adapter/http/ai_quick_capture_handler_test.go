@@ -20,10 +20,12 @@ import (
 )
 
 type fakeAssistantGateway struct {
-	catalog       []domain.OpenRouterModel
-	extractFn     func(ctx context.Context, settings domain.AISettings, in domain.AssistantExtractInput) (domain.ExtractedJobPostingDraft, error)
-	extractCalls  []domain.AssistantExtractInput
-	settingsCalls []domain.AISettings
+	catalog         []domain.OpenRouterModel
+	extractFn       func(ctx context.Context, settings domain.AISettings, in domain.AssistantExtractInput) (domain.ExtractedJobPostingDraft, error)
+	assessFitFn     func(ctx context.Context, settings domain.AISettings, in domain.AssistantAssessFitInput) (domain.AssistantFitAssessmentDraft, error)
+	draftArtifactFn func(ctx context.Context, settings domain.AISettings, in domain.AssistantDraftArtifactInput) (domain.AssistantArtifactDraft, error)
+	extractCalls    []domain.AssistantExtractInput
+	settingsCalls   []domain.AISettings
 }
 
 func (f *fakeAssistantGateway) ExtractJobPosting(ctx context.Context, settings domain.AISettings, in domain.AssistantExtractInput) (domain.ExtractedJobPostingDraft, error) {
@@ -33,6 +35,22 @@ func (f *fakeAssistantGateway) ExtractJobPosting(ctx context.Context, settings d
 		return f.extractFn(ctx, settings, in)
 	}
 	return domain.ExtractedJobPostingDraft{}, domain.ErrAssistantUnavailable
+}
+
+func (f *fakeAssistantGateway) AssessFit(ctx context.Context, settings domain.AISettings, in domain.AssistantAssessFitInput) (domain.AssistantFitAssessmentDraft, error) {
+	f.settingsCalls = append(f.settingsCalls, settings)
+	if f.assessFitFn != nil {
+		return f.assessFitFn(ctx, settings, in)
+	}
+	return domain.AssistantFitAssessmentDraft{}, domain.ErrAssistantUnavailable
+}
+
+func (f *fakeAssistantGateway) DraftArtifact(ctx context.Context, settings domain.AISettings, in domain.AssistantDraftArtifactInput) (domain.AssistantArtifactDraft, error) {
+	f.settingsCalls = append(f.settingsCalls, settings)
+	if f.draftArtifactFn != nil {
+		return f.draftArtifactFn(ctx, settings, in)
+	}
+	return domain.AssistantArtifactDraft{}, domain.ErrAssistantUnavailable
 }
 
 func (f *fakeAssistantGateway) ListOpenRouterModels(_ context.Context, _ domain.AISettings) ([]domain.OpenRouterModel, error) {

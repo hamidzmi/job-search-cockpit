@@ -14,6 +14,7 @@ import {
   OpportunityJobPostingFields,
 } from './OpportunityDetailsFields';
 import { OpportunityContactsAndActions } from './OpportunityContactsAndActions';
+import { OpportunityFitAndArtifacts } from './OpportunityFitAndArtifacts';
 import {
   buildOpportunityDetailsInput,
   createEmptyDetailsDraft,
@@ -269,6 +270,8 @@ export function OpportunityDetailWorkspace() {
             </div>
           </form>
         </section>
+
+        <OpportunityFitAndArtifacts opportunityId={opportunity.id} />
 
         <OpportunityContactsAndActions opportunityId={opportunity.id} />
       </div>

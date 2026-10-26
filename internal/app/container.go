@@ -5,6 +5,7 @@ import (
 
 	aiadapter "job-search-cockpit/internal/adapter/ai"
 	clockadapter "job-search-cockpit/internal/adapter/clock"
+	fsadapter "job-search-cockpit/internal/adapter/fs"
 	httpadapter "job-search-cockpit/internal/adapter/http"
 	"job-search-cockpit/internal/adapter/scraper"
 	"job-search-cockpit/internal/adapter/sqlite"
@@ -13,9 +14,10 @@ import (
 )
 
 type Dependencies struct {
-	Clock            outbound.Clock
-	AssistantGateway outbound.AssistantGateway
-	JobPageParser    outbound.JobPageParser
+	Clock             outbound.Clock
+	AssistantGateway  outbound.AssistantGateway
+	JobPageParser     outbound.JobPageParser
+	ArtifactBlobStore outbound.ArtifactBlobStore
 }
 
 func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
@@ -31,6 +33,10 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 	if parser == nil {
 		parser = scraper.NewJobPageParser(nil)
 	}
+	blobStore := deps.ArtifactBlobStore
+	if blobStore == nil {
+		blobStore = fsadapter.NewLocalArtifactBlobStore("")
+	}
 
 	companySvc := usecase.NewCompanyService(store, store, clock)
 	opportunitySvc := usecase.NewOpportunityService(store, store, store, store, clock)
@@ -41,6 +47,8 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 	contactSvc := usecase.NewContactService(store, store, store, store, clock)
 	interactionSvc := usecase.NewInteractionService(store, store, store, store, store, clock)
 	actionItemSvc := usecase.NewActionItemService(store, store, store, store, clock)
+	fitAssessmentSvc := usecase.NewFitAssessmentService(store, store, store, store, store, store, assistant, clock)
+	artifactSvc := usecase.NewApplicationArtifactService(store, store, store, store, store, store, store, assistant, blobStore, clock)
 
 	return httpadapter.NewRouter(
 		httpadapter.NewCompanyHandler(companySvc),
@@ -52,5 +60,7 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 		httpadapter.NewContactHandler(contactSvc),
 		httpadapter.NewInteractionHandler(interactionSvc),
 		httpadapter.NewActionItemHandler(actionItemSvc),
+		httpadapter.NewFitAssessmentHandler(fitAssessmentSvc),
+		httpadapter.NewApplicationArtifactHandler(artifactSvc),
 	)
 }

@@ -199,3 +199,8 @@ func (o *Opportunity) RecordActivity(activityAt, now time.Time) {
 	o.UpdatedAt = now.UTC()
 }
 
+func (o *Opportunity) TouchUpdatedAt(now time.Time) {
+	o.UpdatedAt = now.UTC()
+}
+
+

@@ -217,6 +217,248 @@ Return ONLY valid JSON with fields:
 	}, nil
 }
 
+func (g *HTTPAssistantGateway) AssessFit(ctx context.Context, settings domain.AISettings, in domain.AssistantAssessFitInput) (domain.AssistantFitAssessmentDraft, error) {
+	if !settings.IsConfigured() {
+		return domain.AssistantFitAssessmentDraft{}, fmt.Errorf("%w: AI provider is not configured", domain.ErrAssistantUnavailable)
+	}
+
+	model := settings.ResolveReasoningModel(in.ModelOverride)
+	if model == "" {
+		model = defaultReasoningModelForProvider(settings.Provider)
+	}
+
+	systemPrompt := `You are a career coach and staff engineering hiring bar evaluator for a Job Search Cockpit.
+Compare the Opportunity and Job Posting against the Candidate Profile and Story Bank.
+Return ONLY valid JSON with fields:
+{
+  "overall_score": 85,
+  "overall_summary": "string",
+  "matched_strengths": ["string"],
+  "gaps_and_risks": ["string"],
+  "compensation_alignment": "string",
+  "recommended_story_ids": ["story-id"]
+}`
+
+	userPrompt := buildFitAssessmentPrompt(in)
+	content, usedModel, err := g.completeChatJSON(ctx, settings, model, systemPrompt, userPrompt, 0.2)
+	if err != nil {
+		return domain.AssistantFitAssessmentDraft{}, err
+	}
+
+	var parsed struct {
+		OverallScore          int      `json:"overall_score"`
+		OverallSummary        string   `json:"overall_summary"`
+		MatchedStrengths      []string `json:"matched_strengths"`
+		GapsAndRisks          []string `json:"gaps_and_risks"`
+		CompensationAlignment string   `json:"compensation_alignment"`
+		RecommendedStoryIDs   []string `json:"recommended_story_ids"`
+	}
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		return domain.AssistantFitAssessmentDraft{}, fmt.Errorf("%w: failed to parse fit assessment json: %v", domain.ErrAssistantUnavailable, err)
+	}
+
+	compAlign := strings.TrimSpace(parsed.CompensationAlignment)
+	if compAlign == "" {
+		compAlign = domain.EvaluateCompensationAlignment(in.Opportunity.Opportunity.JobPosting, in.Profile)
+	}
+
+	score := parsed.OverallScore
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+
+	return domain.AssistantFitAssessmentDraft{
+		OverallScore:          score,
+		OverallSummary:        strings.TrimSpace(parsed.OverallSummary),
+		MatchedStrengths:      parsed.MatchedStrengths,
+		GapsAndRisks:          parsed.GapsAndRisks,
+		CompensationAlignment: compAlign,
+		RecommendedStoryIDs:   parsed.RecommendedStoryIDs,
+		ModelUsed:             usedModel,
+	}, nil
+}
+
+func (g *HTTPAssistantGateway) DraftArtifact(ctx context.Context, settings domain.AISettings, in domain.AssistantDraftArtifactInput) (domain.AssistantArtifactDraft, error) {
+	if !settings.IsConfigured() {
+		return domain.AssistantArtifactDraft{}, fmt.Errorf("%w: AI provider is not configured", domain.ErrAssistantUnavailable)
+	}
+
+	model := settings.ResolveReasoningModel(in.ModelOverride)
+	if model == "" {
+		model = defaultReasoningModelForProvider(settings.Provider)
+	}
+
+	systemPrompt := `You are an expert technical resume and application writer for a Job Search Cockpit.
+Draft a tailored, ATS-friendly Markdown Application Artifact grounded strictly in the Candidate Profile, Story Bank, and Job Posting.
+Return ONLY valid JSON with fields:
+{
+  "title": "string",
+  "content_markdown": "string"
+}`
+
+	userPrompt := buildArtifactDraftPrompt(in)
+	content, usedModel, err := g.completeChatJSON(ctx, settings, model, systemPrompt, userPrompt, 0.3)
+	if err != nil {
+		return domain.AssistantArtifactDraft{}, err
+	}
+
+	var parsed struct {
+		Title           string `json:"title"`
+		ContentMarkdown string `json:"content_markdown"`
+	}
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		// Graceful fallback if the LLM returned raw Markdown directly
+		parsed.ContentMarkdown = content
+	}
+
+	title := strings.TrimSpace(parsed.Title)
+	if title == "" {
+		title = strings.TrimSpace(in.Title)
+	}
+	if title == "" {
+		title = fmt.Sprintf("Tailored %s — %s", in.Kind, in.Opportunity.Opportunity.RoleTitle)
+	}
+
+	return domain.AssistantArtifactDraft{
+		Kind:            in.Kind,
+		Title:           title,
+		ContentMarkdown: strings.TrimSpace(parsed.ContentMarkdown),
+		ModelUsed:       usedModel,
+	}, nil
+}
+
+func (g *HTTPAssistantGateway) completeChatJSON(
+	ctx context.Context,
+	settings domain.AISettings,
+	model string,
+	systemPrompt string,
+	userPrompt string,
+	temperature float64,
+) (string, string, error) {
+	endpoint := resolveChatCompletionsEndpoint(settings)
+	reqBody := map[string]any{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": userPrompt},
+		},
+		"temperature": temperature,
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", "", fmt.Errorf("encode llm request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return "", "", fmt.Errorf("%w: build request: %v", domain.ErrAssistantUnavailable, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if strings.TrimSpace(settings.APIKey) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(settings.APIKey))
+	}
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("%w: llm request failed: %v", domain.ErrAssistantUnavailable, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return "", "", fmt.Errorf("%w: status %d: %s", domain.ErrAssistantUnavailable, resp.StatusCode, strings.TrimSpace(string(msg)))
+	}
+
+	var chatResp struct {
+		Model   string `json:"model"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil || len(chatResp.Choices) == 0 {
+		return "", "", fmt.Errorf("%w: invalid llm response payload", domain.ErrAssistantUnavailable)
+	}
+
+	usedModel := strings.TrimSpace(chatResp.Model)
+	if usedModel == "" {
+		usedModel = model
+	}
+
+	return cleanJSONFence(chatResp.Choices[0].Message.Content), usedModel, nil
+}
+
+func buildFitAssessmentPrompt(in domain.AssistantAssessFitInput) string {
+	opp := in.Opportunity.Opportunity
+	jp := opp.JobPosting
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Company: %s\nRole: %s (%s)\nLocation: %s (%s)\nStated Comp: %d-%d %s\n",
+		in.Opportunity.CompanyName, opp.RoleTitle, opp.Seniority, opp.Location, opp.RemotePolicy,
+		jp.StatedMinComp, jp.StatedMaxComp, jp.Currency,
+	)
+	fmt.Fprintf(&sb, "Requirements: %s\nTech Stack: %s\nJob Posting Raw Text:\n%s\n\n",
+		strings.Join(jp.Requirements, "; "), strings.Join(jp.TechStackTags, ", "), jp.RawText,
+	)
+	fmt.Fprintf(&sb, "Candidate Profile: %s (%s)\nSummary: %s\nSkills: %s\nComp Floor: %d %s (Target: %d %s)\n",
+		in.Profile.FullName, in.Profile.Headline, in.Profile.Summary,
+		strings.Join(in.Profile.Skills, ", "),
+		in.Profile.CompensationFloor, in.Profile.Currency, in.Profile.TargetCompensation, in.Profile.Currency,
+	)
+	for _, wh := range in.Profile.WorkHistory {
+		fmt.Fprintf(&sb, "- %s at %s (%s - %s): %s | %s\n",
+			wh.Title, wh.Company, wh.StartDate, wh.EndDate, wh.Summary, strings.Join(wh.ImpactBullets, "; "),
+		)
+	}
+	sb.WriteString("\nStory Bank:\n")
+	for _, st := range in.Stories {
+		fmt.Fprintf(&sb, "- ID=%s | Title=%s | Hook=%s | Result=%s | Skills=%s\n",
+			st.ID, st.Title, st.Hook, st.Result, strings.Join(st.SkillTags, ", "),
+		)
+	}
+	return sb.String()
+}
+
+func buildArtifactDraftPrompt(in domain.AssistantDraftArtifactInput) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Artifact Kind: %s\nRequested Title: %s\nInstructions: %s\n",
+		in.Kind, in.Title, in.Instructions,
+	)
+	if strings.TrimSpace(in.ExistingContent) != "" {
+		fmt.Fprintf(&sb, "Existing Draft to Refine:\n%s\n\n", in.ExistingContent)
+	}
+	if in.FitAssessment != nil {
+		fmt.Fprintf(&sb, "Fit Assessment Summary: %s (Matched Strengths: %s)\n\n",
+			in.FitAssessment.OverallSummary, strings.Join(in.FitAssessment.MatchedStrengths, "; "),
+		)
+	}
+	sb.WriteString(buildFitAssessmentPrompt(domain.AssistantAssessFitInput{
+		Opportunity: in.Opportunity,
+		Profile:     in.Profile,
+		Stories:     in.Stories,
+	}))
+	return sb.String()
+}
+
+func defaultReasoningModelForProvider(p domain.AIProvider) string {
+	switch p {
+	case domain.AIProviderOpenAI:
+		return "gpt-4o"
+	case domain.AIProviderAnthropic:
+		return "claude-3-7-sonnet-latest"
+	case domain.AIProviderGemini:
+		return "gemini-2.5-pro"
+	case domain.AIProviderOllama:
+		return "llama3.2:latest"
+	default:
+		return "anthropic/claude-3.7-sonnet"
+	}
+}
+
 func resolveChatCompletionsEndpoint(settings domain.AISettings) string {
 	base := strings.TrimRight(strings.TrimSpace(settings.BaseURL), "/")
 	if base != "" {

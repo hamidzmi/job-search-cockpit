@@ -517,6 +517,46 @@ function installStubbedHttpHandlers(seed?: {
       return jsonResponse(updated);
     }
 
+    if (url.pathname === '/api/stories' && method === 'GET') {
+      return jsonResponse([]);
+    }
+
+    if (url.pathname === '/api/settings/ai' && method === 'GET') {
+      return jsonResponse({
+        provider: 'openrouter',
+        base_url: '',
+        api_key: '',
+        has_api_key: false,
+        is_configured: false,
+        fast_extraction_model: '',
+        reasoning_tailoring_model: '',
+        bookmarked_models: [],
+        updated_at: nextIso(),
+      });
+    }
+
+    const fitMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/fit-assessment$/);
+    if (fitMatch && method === 'GET') {
+      const oppId = decodeURIComponent(fitMatch[1]);
+      return jsonResponse({
+        opportunity_id: oppId,
+        overall_score: 0,
+        overall_summary: '',
+        matched_strengths: [],
+        gaps_and_risks: [],
+        compensation_alignment: 'No compensation floor configured on Candidate Profile.',
+        recommended_story_ids: [],
+        recommended_stories: [],
+        model_used: '',
+        updated_at: '',
+      });
+    }
+
+    const artifactsMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/artifacts$/);
+    if (artifactsMatch && method === 'GET') {
+      return jsonResponse([]);
+    }
+
     return jsonResponse({ error: { code: 'not_found', message: `unhandled ${method} ${url.pathname}` } }, 404);
   });
 

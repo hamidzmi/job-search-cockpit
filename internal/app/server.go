@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	fsadapter "job-search-cockpit/internal/adapter/fs"
 	"job-search-cockpit/internal/adapter/sqlite"
 )
 
@@ -20,7 +21,9 @@ func Run(ctx context.Context, cfg Config) error {
 		_ = store.Close()
 	}()
 
-	handler := NewHTTPHandler(store, Dependencies{})
+	handler := NewHTTPHandler(store, Dependencies{
+		ArtifactBlobStore: fsadapter.NewLocalArtifactBlobStore(cfg.ArtifactsDir()),
+	})
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           handler,

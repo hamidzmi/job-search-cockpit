@@ -455,3 +455,84 @@ export interface LogInteractionResponse {
   interaction: Interaction;
   follow_up_action_item?: ActionItem;
 }
+
+export const ARTIFACT_KINDS = [
+  'resume',
+  'cover_letter',
+  'screening_qa',
+  'other',
+] as const;
+
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+
+export interface RecommendedStorySummary {
+  id: string;
+  title: string;
+  hook: string;
+  competency_tags: string[];
+  skill_tags: string[];
+}
+
+export interface FitAssessment {
+  opportunity_id: string;
+  overall_score: number;
+  overall_summary: string;
+  matched_strengths: string[];
+  gaps_and_risks: string[];
+  compensation_alignment: string;
+  recommended_story_ids: string[];
+  recommended_stories: RecommendedStorySummary[];
+  model_used: string;
+  updated_at: string;
+}
+
+export interface FitAssessmentUpsertInput {
+  overall_score: number;
+  overall_summary: string;
+  matched_strengths: string[];
+  gaps_and_risks: string[];
+  compensation_alignment: string;
+  recommended_story_ids: string[];
+  model_used?: string;
+}
+
+export interface ApplicationArtifact {
+  id: string;
+  opportunity_id: string;
+  kind: ArtifactKind;
+  title: string;
+  content_markdown: string;
+  has_attached_file: boolean;
+  file_name: string;
+  mime_type: string;
+  file_size_bytes: number;
+  download_url: string;
+  is_submitted: boolean;
+  model_used: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationArtifactUpsertInput {
+  kind: ArtifactKind;
+  title: string;
+  content_markdown: string;
+  is_submitted: boolean;
+  model_used?: string;
+}
+
+export interface ArtifactDraftInput {
+  kind: ArtifactKind;
+  title?: string;
+  existing_content?: string;
+  instructions?: string;
+  model_override?: string;
+}
+
+export interface ArtifactDraft {
+  kind: ArtifactKind;
+  title: string;
+  content_markdown: string;
+  model_used: string;
+}
+
