@@ -16,9 +16,6 @@ type CompanyService struct {
 }
 
 func NewCompanyService(tx outbound.TxManager, companies outbound.CompanyRepository, clock outbound.Clock) *CompanyService {
-	if clock == nil {
-		clock = outbound.SystemClock{}
-	}
 	return &CompanyService{
 		tx:        tx,
 		companies: companies,

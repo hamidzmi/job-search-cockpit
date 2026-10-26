@@ -9,7 +9,6 @@ import (
 type Opportunity struct {
 	ID             string
 	CompanyID      string
-	CompanyName    string
 	RoleTitle      string
 	Seniority      string
 	Location       string

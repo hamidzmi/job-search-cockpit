@@ -142,7 +142,8 @@ func toStageTransitionDTO(tr domain.StageTransition) StageTransitionDTO {
 	}
 }
 
-func toOpportunityDTO(o domain.Opportunity, transitions []domain.StageTransition) OpportunityDTO {
+func toOpportunityDTO(v domain.OpportunityView, transitions []domain.StageTransition) OpportunityDTO {
+	o := v.Opportunity
 	reqs := o.JobPosting.Requirements
 	if reqs == nil {
 		reqs = []string{}
@@ -163,7 +164,7 @@ func toOpportunityDTO(o domain.Opportunity, transitions []domain.StageTransition
 	return OpportunityDTO{
 		ID:           o.ID,
 		CompanyID:    o.CompanyID,
-		CompanyName:  o.CompanyName,
+		CompanyName:  v.CompanyName,
 		RoleTitle:    o.RoleTitle,
 		Seniority:    o.Seniority,
 		Location:     o.Location,

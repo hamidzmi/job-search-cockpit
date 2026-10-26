@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	clockadapter "job-search-cockpit/internal/adapter/clock"
 	httpadapter "job-search-cockpit/internal/adapter/http"
 	"job-search-cockpit/internal/adapter/sqlite"
 	"job-search-cockpit/internal/usecase"
@@ -16,7 +17,7 @@ type Dependencies struct {
 func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 	clock := deps.Clock
 	if clock == nil {
-		clock = outbound.SystemClock{}
+		clock = clockadapter.SystemClock{}
 	}
 
 	companySvc := usecase.NewCompanyService(store, store, clock)

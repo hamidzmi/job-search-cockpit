@@ -62,6 +62,22 @@ func (s *Store) SaveOpportunity(ctx context.Context, opp domain.Opportunity) err
 func (s *Store) GetOpportunity(ctx context.Context, id string) (domain.Opportunity, error) {
 	row := s.exec(ctx).QueryRowContext(ctx, `
 		SELECT
+			id, company_id, role_title, seniority, location, remote_policy, priority,
+			stage, outcome, notes, source_url, raw_text, requirements_json, tech_stack_tags_json,
+			stated_min_comp, stated_max_comp, currency, last_activity_at, created_at, updated_at
+		FROM opportunities
+		WHERE id = ?
+	`, id)
+	opp, err := scanOpportunityOnly(row.Scan)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Opportunity{}, fmt.Errorf("%w: opportunity %s", domain.ErrNotFound, id)
+	}
+	return opp, err
+}
+
+func (s *Store) GetOpportunityView(ctx context.Context, id string) (domain.OpportunityView, error) {
+	row := s.exec(ctx).QueryRowContext(ctx, `
+		SELECT
 			o.id, o.company_id, c.name, o.role_title, o.seniority, o.location, o.remote_policy, o.priority,
 			o.stage, o.outcome, o.notes, o.source_url, o.raw_text, o.requirements_json, o.tech_stack_tags_json,
 			o.stated_min_comp, o.stated_max_comp, o.currency, o.last_activity_at, o.created_at, o.updated_at
@@ -69,14 +85,14 @@ func (s *Store) GetOpportunity(ctx context.Context, id string) (domain.Opportuni
 		JOIN companies c ON c.id = o.company_id
 		WHERE o.id = ?
 	`, id)
-	opp, err := scanOpportunity(row.Scan)
+	view, err := scanOpportunityView(row.Scan)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Opportunity{}, fmt.Errorf("%w: opportunity %s", domain.ErrNotFound, id)
+		return domain.OpportunityView{}, fmt.Errorf("%w: opportunity %s", domain.ErrNotFound, id)
 	}
-	return opp, err
+	return view, err
 }
 
-func (s *Store) ListOpportunities(ctx context.Context, filter domain.OpportunityFilter) ([]domain.Opportunity, error) {
+func (s *Store) ListOpportunities(ctx context.Context, filter domain.OpportunityFilter) ([]domain.OpportunityView, error) {
 	var clauses []string
 	var args []any
 
@@ -125,25 +141,25 @@ func (s *Store) ListOpportunities(ctx context.Context, filter domain.Opportunity
 	}
 	defer rows.Close()
 
-	var result []domain.Opportunity
+	var result []domain.OpportunityView
 	for rows.Next() {
-		opp, err := scanOpportunity(rows.Scan)
+		view, err := scanOpportunityView(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, opp)
+		result = append(result, view)
 	}
 	if result == nil {
-		result = []domain.Opportunity{}
+		result = []domain.OpportunityView{}
 	}
 	return result, rows.Err()
 }
 
-func scanOpportunity(scan func(dest ...any) error) (domain.Opportunity, error) {
+func scanOpportunityOnly(scan func(dest ...any) error) (domain.Opportunity, error) {
 	var opp domain.Opportunity
 	var stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
 	err := scan(
-		&opp.ID, &opp.CompanyID, &opp.CompanyName, &opp.RoleTitle, &opp.Seniority, &opp.Location, &opp.RemotePolicy, &opp.Priority,
+		&opp.ID, &opp.CompanyID, &opp.RoleTitle, &opp.Seniority, &opp.Location, &opp.RemotePolicy, &opp.Priority,
 		&stageStr, &outcomeStr, &opp.Notes,
 		&opp.JobPosting.SourceURL, &opp.JobPosting.RawText, &reqsJSON, &tagsJSON,
 		&opp.JobPosting.StatedMinComp, &opp.JobPosting.StatedMaxComp, &opp.JobPosting.Currency,
@@ -166,6 +182,39 @@ func scanOpportunity(scan func(dest ...any) error) (domain.Opportunity, error) {
 	opp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdStr)
 	opp.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedStr)
 	return opp, nil
+}
+
+func scanOpportunityView(scan func(dest ...any) error) (domain.OpportunityView, error) {
+	var opp domain.Opportunity
+	var companyName string
+	var stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
+	err := scan(
+		&opp.ID, &opp.CompanyID, &companyName, &opp.RoleTitle, &opp.Seniority, &opp.Location, &opp.RemotePolicy, &opp.Priority,
+		&stageStr, &outcomeStr, &opp.Notes,
+		&opp.JobPosting.SourceURL, &opp.JobPosting.RawText, &reqsJSON, &tagsJSON,
+		&opp.JobPosting.StatedMinComp, &opp.JobPosting.StatedMaxComp, &opp.JobPosting.Currency,
+		&lastActStr, &createdStr, &updatedStr,
+	)
+	if err != nil {
+		return domain.OpportunityView{}, err
+	}
+	opp.Stage = domain.Stage(stageStr)
+	opp.Outcome = domain.Outcome(outcomeStr)
+	_ = json.Unmarshal([]byte(reqsJSON), &opp.JobPosting.Requirements)
+	_ = json.Unmarshal([]byte(tagsJSON), &opp.JobPosting.TechStackTags)
+	if opp.JobPosting.Requirements == nil {
+		opp.JobPosting.Requirements = []string{}
+	}
+	if opp.JobPosting.TechStackTags == nil {
+		opp.JobPosting.TechStackTags = []string{}
+	}
+	opp.LastActivityAt, _ = time.Parse(time.RFC3339Nano, lastActStr)
+	opp.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdStr)
+	opp.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedStr)
+	return domain.OpportunityView{
+		Opportunity: opp,
+		CompanyName: companyName,
+	}, nil
 }
 
 func nonNilSlice(items []string) []string {

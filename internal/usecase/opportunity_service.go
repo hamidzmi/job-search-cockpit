@@ -24,9 +24,6 @@ func NewOpportunityService(
 	transitions outbound.StageTransitionRepository,
 	clock outbound.Clock,
 ) *OpportunityService {
-	if clock == nil {
-		clock = outbound.SystemClock{}
-	}
 	return &OpportunityService{
 		tx:          tx,
 		companies:   companies,
@@ -36,8 +33,8 @@ func NewOpportunityService(
 	}
 }
 
-func (s *OpportunityService) CreateOpportunity(ctx context.Context, in domain.OpportunityInput) (domain.Opportunity, error) {
-	var created domain.Opportunity
+func (s *OpportunityService) CreateOpportunity(ctx context.Context, in domain.OpportunityInput) (domain.OpportunityView, error) {
+	var created domain.OpportunityView
 	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		company, err := s.companies.GetCompany(txCtx, in.CompanyID)
 		if err != nil {
@@ -47,43 +44,45 @@ func (s *OpportunityService) CreateOpportunity(ctx context.Context, in domain.Op
 		if err != nil {
 			return err
 		}
-		opp.CompanyName = company.Name
 		if err := s.opps.SaveOpportunity(txCtx, opp); err != nil {
 			return err
 		}
 		if err := s.transitions.AppendStageTransition(txCtx, tr); err != nil {
 			return err
 		}
-		created = opp
+		created = domain.OpportunityView{
+			Opportunity: opp,
+			CompanyName: company.Name,
+		}
 		return nil
 	})
 	if err != nil {
-		return domain.Opportunity{}, err
+		return domain.OpportunityView{}, err
 	}
 	return created, nil
 }
 
-func (s *OpportunityService) GetOpportunity(ctx context.Context, id string) (domain.Opportunity, []domain.StageTransition, error) {
-	opp, err := s.opps.GetOpportunity(ctx, id)
+func (s *OpportunityService) GetOpportunity(ctx context.Context, id string) (domain.OpportunityView, []domain.StageTransition, error) {
+	view, err := s.opps.GetOpportunityView(ctx, id)
 	if err != nil {
-		return domain.Opportunity{}, nil, err
+		return domain.OpportunityView{}, nil, err
 	}
-	history, err := s.transitions.ListStageTransitions(ctx, id)
+	stageTransitions, err := s.transitions.ListStageTransitions(ctx, id)
 	if err != nil {
-		return domain.Opportunity{}, nil, err
+		return domain.OpportunityView{}, nil, err
 	}
-	return opp, history, nil
+	return view, stageTransitions, nil
 }
 
-func (s *OpportunityService) ListOpportunities(ctx context.Context, filter domain.OpportunityFilter) ([]domain.Opportunity, error) {
+func (s *OpportunityService) ListOpportunities(ctx context.Context, filter domain.OpportunityFilter) ([]domain.OpportunityView, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}
 	return s.opps.ListOpportunities(ctx, filter)
 }
 
-func (s *OpportunityService) UpdateOpportunityDetails(ctx context.Context, id string, in domain.OpportunityDetailsInput) (domain.Opportunity, error) {
-	var updated domain.Opportunity
+func (s *OpportunityService) UpdateOpportunityDetails(ctx context.Context, id string, in domain.OpportunityDetailsInput) (domain.OpportunityView, error) {
+	var updated domain.OpportunityView
 	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		opp, err := s.opps.GetOpportunity(txCtx, id)
 		if err != nil {
@@ -92,25 +91,24 @@ func (s *OpportunityService) UpdateOpportunityDetails(ctx context.Context, id st
 		if err := opp.UpdateDetails(in, s.clock.Now()); err != nil {
 			return err
 		}
-		company, err := s.companies.GetCompany(txCtx, opp.CompanyID)
-		if err != nil {
-			return err
-		}
-		opp.CompanyName = company.Name
 		if err := s.opps.SaveOpportunity(txCtx, opp); err != nil {
 			return err
 		}
-		updated = opp
+		view, err := s.opps.GetOpportunityView(txCtx, id)
+		if err != nil {
+			return err
+		}
+		updated = view
 		return nil
 	})
 	if err != nil {
-		return domain.Opportunity{}, err
+		return domain.OpportunityView{}, err
 	}
 	return updated, nil
 }
 
-func (s *OpportunityService) TransitionOpportunity(ctx context.Context, id string, toStage domain.Stage, toOutcome domain.Outcome, note string) (domain.Opportunity, error) {
-	var updated domain.Opportunity
+func (s *OpportunityService) TransitionOpportunity(ctx context.Context, id string, toStage domain.Stage, toOutcome domain.Outcome, note string) (domain.OpportunityView, error) {
+	var updated domain.OpportunityView
 	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
 		opp, err := s.opps.GetOpportunity(txCtx, id)
 		if err != nil {
@@ -126,11 +124,15 @@ func (s *OpportunityService) TransitionOpportunity(ctx context.Context, id strin
 		if err := s.transitions.AppendStageTransition(txCtx, tr); err != nil {
 			return err
 		}
-		updated = opp
+		view, err := s.opps.GetOpportunityView(txCtx, id)
+		if err != nil {
+			return err
+		}
+		updated = view
 		return nil
 	})
 	if err != nil {
-		return domain.Opportunity{}, err
+		return domain.OpportunityView{}, err
 	}
 	return updated, nil
 }
