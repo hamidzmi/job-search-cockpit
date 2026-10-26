@@ -126,6 +126,32 @@ func (s *Store) GetInterviewRound(ctx context.Context, id string) (domain.Interv
 	return round, err
 }
 
+func (s *Store) ListAllInterviewRounds(ctx context.Context) ([]domain.InterviewRound, error) {
+	rows, err := s.exec(ctx).QueryContext(ctx, `
+		SELECT
+			id, opportunity_id, round_order, round_type, title,
+			scheduled_at, duration_minutes, status, prep_notes,
+			contact_ids_json, story_ids_json, debrief_json,
+			created_at, updated_at
+		FROM interview_rounds
+		ORDER BY scheduled_at ASC, id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := []domain.InterviewRound{}
+	for rows.Next() {
+		r, err := scanInterviewRound(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) ListInterviewRoundsByOpportunity(ctx context.Context, opportunityID string) ([]domain.InterviewRound, error) {
 	rows, err := s.exec(ctx).QueryContext(ctx, `
 		SELECT

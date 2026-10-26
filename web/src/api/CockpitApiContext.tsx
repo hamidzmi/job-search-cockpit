@@ -8,6 +8,7 @@ import {
 } from './backupAndSeedApi';
 import { type CompanyApi, defaultCompanyApi } from './companyApi';
 import { type ContactApi, defaultContactApi } from './contactApi';
+import { type FlightDeckApi, defaultFlightDeckApi } from './flightDeckApi';
 import { type InteractionApi, defaultInteractionApi } from './interactionApi';
 import {
   type InterviewRoundApi,
@@ -32,6 +33,7 @@ export interface CockpitApi {
   actionItems: ActionItemApi;
   interviewRounds: InterviewRoundApi;
   tailoring: TailoringApi;
+  flightDeck: FlightDeckApi;
   offers: OfferApi;
   analytics: AnalyticsApi;
   backupAndSeed: BackupAndSeedApi;
@@ -49,6 +51,7 @@ const defaultCockpitApi: CockpitApi = {
   actionItems: defaultActionItemApi,
   interviewRounds: defaultInterviewRoundApi,
   tailoring: defaultTailoringApi,
+  flightDeck: defaultFlightDeckApi,
   offers: defaultOfferApi,
   analytics: defaultAnalyticsApi,
   backupAndSeed: defaultBackupAndSeedApi,
