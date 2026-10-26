@@ -69,36 +69,6 @@ func (r JobPostingRequest) toDomain() domain.JobPosting {
 	}
 }
 
-type OpportunityCreateRequest struct {
-	CompanyID    string            `json:"company_id"`
-	RoleTitle    string            `json:"role_title"`
-	Seniority    string            `json:"seniority"`
-	Location     string            `json:"location"`
-	RemotePolicy string            `json:"remote_policy"`
-	Priority     string            `json:"priority"`
-	Stage        string            `json:"stage"`
-	Outcome      string            `json:"outcome"`
-	Notes        string            `json:"notes"`
-	Note         string            `json:"note"`
-	JobPosting   JobPostingRequest `json:"job_posting"`
-}
-
-func (r OpportunityCreateRequest) toDomainInput() domain.OpportunityInput {
-	return domain.OpportunityInput{
-		CompanyID:    r.CompanyID,
-		RoleTitle:    r.RoleTitle,
-		Seniority:    r.Seniority,
-		Location:     r.Location,
-		RemotePolicy: r.RemotePolicy,
-		Priority:     r.Priority,
-		Stage:        domain.Stage(r.Stage),
-		Outcome:      domain.Outcome(r.Outcome),
-		Notes:        r.Notes,
-		Note:         r.Note,
-		JobPosting:   r.JobPosting.toDomain(),
-	}
-}
-
 type OpportunityUpdateRequest struct {
 	CompanyID    string            `json:"company_id"`
 	RoleTitle    string            `json:"role_title"`
@@ -116,10 +86,31 @@ func (r OpportunityUpdateRequest) toDomainInput() domain.OpportunityDetailsInput
 		RoleTitle:    r.RoleTitle,
 		Seniority:    r.Seniority,
 		Location:     r.Location,
-		RemotePolicy: r.RemotePolicy,
-		Priority:     r.Priority,
+		RemotePolicy: domain.RemotePolicy(r.RemotePolicy),
+		Priority:     domain.Priority(r.Priority),
 		Notes:        r.Notes,
 		JobPosting:   r.JobPosting.toDomain(),
+	}
+}
+
+type OpportunityCreateRequest struct {
+	OpportunityUpdateRequest
+	Stage          string `json:"stage"`
+	Outcome        string `json:"outcome"`
+	TransitionNote string `json:"transition_note"`
+	Note           string `json:"note"`
+}
+
+func (r OpportunityCreateRequest) toDomainInput() domain.OpportunityInput {
+	transitionNote := r.TransitionNote
+	if transitionNote == "" {
+		transitionNote = r.Note
+	}
+	return domain.OpportunityInput{
+		OpportunityDetailsInput: r.OpportunityUpdateRequest.toDomainInput(),
+		Stage:                   domain.Stage(r.Stage),
+		Outcome:                 domain.Outcome(r.Outcome),
+		TransitionNote:          transitionNote,
 	}
 }
 
@@ -168,8 +159,8 @@ func toOpportunityDTO(v domain.OpportunityView, transitions []domain.StageTransi
 		RoleTitle:    o.RoleTitle,
 		Seniority:    o.Seniority,
 		Location:     o.Location,
-		RemotePolicy: o.RemotePolicy,
-		Priority:     o.Priority,
+		RemotePolicy: string(o.RemotePolicy),
+		Priority:     string(o.Priority),
 		Stage:        string(o.Stage),
 		Outcome:      string(o.Outcome),
 		Notes:        o.Notes,

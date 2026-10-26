@@ -30,8 +30,8 @@ func (h *OpportunityHandler) handleListOpportunities(w http.ResponseWriter, r *h
 	filter := domain.OpportunityFilter{
 		Stage:        domain.Stage(q.Get("stage")),
 		Outcome:      domain.Outcome(q.Get("outcome")),
-		Priority:     q.Get("priority"),
-		RemotePolicy: q.Get("remote_policy"),
+		Priority:     domain.Priority(q.Get("priority")),
+		RemotePolicy: domain.RemotePolicy(q.Get("remote_policy")),
 		CompanyID:    q.Get("company_id"),
 		Query:        q.Get("q"),
 	}

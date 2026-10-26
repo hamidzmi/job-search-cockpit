@@ -48,7 +48,7 @@ func (s *Store) SaveOpportunity(ctx context.Context, opp domain.Opportunity) err
 			last_activity_at = excluded.last_activity_at,
 			updated_at = excluded.updated_at
 	`,
-		opp.ID, opp.CompanyID, opp.RoleTitle, opp.Seniority, opp.Location, opp.RemotePolicy, opp.Priority,
+		opp.ID, opp.CompanyID, opp.RoleTitle, opp.Seniority, opp.Location, string(opp.RemotePolicy), string(opp.Priority),
 		string(opp.Stage), string(opp.Outcome), opp.Notes,
 		opp.JobPosting.SourceURL, opp.JobPosting.RawText, string(reqsJSON), string(tagsJSON),
 		opp.JobPosting.StatedMinComp, opp.JobPosting.StatedMaxComp, opp.JobPosting.Currency,
@@ -104,13 +104,13 @@ func (s *Store) ListOpportunities(ctx context.Context, filter domain.Opportunity
 		clauses = append(clauses, "o.outcome = ?")
 		args = append(args, string(filter.Outcome))
 	}
-	if strings.TrimSpace(filter.Priority) != "" {
-		clauses = append(clauses, "LOWER(o.priority) = LOWER(?)")
-		args = append(args, strings.TrimSpace(filter.Priority))
+	if filter.Priority != "" {
+		clauses = append(clauses, "o.priority = ?")
+		args = append(args, string(filter.Priority))
 	}
-	if strings.TrimSpace(filter.RemotePolicy) != "" {
-		clauses = append(clauses, "LOWER(o.remote_policy) = LOWER(?)")
-		args = append(args, strings.TrimSpace(filter.RemotePolicy))
+	if filter.RemotePolicy != "" {
+		clauses = append(clauses, "o.remote_policy = ?")
+		args = append(args, string(filter.RemotePolicy))
 	}
 	if strings.TrimSpace(filter.CompanyID) != "" {
 		clauses = append(clauses, "o.company_id = ?")
@@ -157,9 +157,9 @@ func (s *Store) ListOpportunities(ctx context.Context, filter domain.Opportunity
 
 func scanOpportunityOnly(scan func(dest ...any) error) (domain.Opportunity, error) {
 	var opp domain.Opportunity
-	var stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
+	var remotePolicyStr, priorityStr, stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
 	err := scan(
-		&opp.ID, &opp.CompanyID, &opp.RoleTitle, &opp.Seniority, &opp.Location, &opp.RemotePolicy, &opp.Priority,
+		&opp.ID, &opp.CompanyID, &opp.RoleTitle, &opp.Seniority, &opp.Location, &remotePolicyStr, &priorityStr,
 		&stageStr, &outcomeStr, &opp.Notes,
 		&opp.JobPosting.SourceURL, &opp.JobPosting.RawText, &reqsJSON, &tagsJSON,
 		&opp.JobPosting.StatedMinComp, &opp.JobPosting.StatedMaxComp, &opp.JobPosting.Currency,
@@ -168,6 +168,8 @@ func scanOpportunityOnly(scan func(dest ...any) error) (domain.Opportunity, erro
 	if err != nil {
 		return domain.Opportunity{}, err
 	}
+	opp.RemotePolicy = domain.RemotePolicy(remotePolicyStr)
+	opp.Priority = domain.Priority(priorityStr)
 	opp.Stage = domain.Stage(stageStr)
 	opp.Outcome = domain.Outcome(outcomeStr)
 	_ = json.Unmarshal([]byte(reqsJSON), &opp.JobPosting.Requirements)
@@ -187,9 +189,9 @@ func scanOpportunityOnly(scan func(dest ...any) error) (domain.Opportunity, erro
 func scanOpportunityView(scan func(dest ...any) error) (domain.OpportunityView, error) {
 	var opp domain.Opportunity
 	var companyName string
-	var stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
+	var remotePolicyStr, priorityStr, stageStr, outcomeStr, reqsJSON, tagsJSON, lastActStr, createdStr, updatedStr string
 	err := scan(
-		&opp.ID, &opp.CompanyID, &companyName, &opp.RoleTitle, &opp.Seniority, &opp.Location, &opp.RemotePolicy, &opp.Priority,
+		&opp.ID, &opp.CompanyID, &companyName, &opp.RoleTitle, &opp.Seniority, &opp.Location, &remotePolicyStr, &priorityStr,
 		&stageStr, &outcomeStr, &opp.Notes,
 		&opp.JobPosting.SourceURL, &opp.JobPosting.RawText, &reqsJSON, &tagsJSON,
 		&opp.JobPosting.StatedMinComp, &opp.JobPosting.StatedMaxComp, &opp.JobPosting.Currency,
@@ -198,6 +200,8 @@ func scanOpportunityView(scan func(dest ...any) error) (domain.OpportunityView, 
 	if err != nil {
 		return domain.OpportunityView{}, err
 	}
+	opp.RemotePolicy = domain.RemotePolicy(remotePolicyStr)
+	opp.Priority = domain.Priority(priorityStr)
 	opp.Stage = domain.Stage(stageStr)
 	opp.Outcome = domain.Outcome(outcomeStr)
 	_ = json.Unmarshal([]byte(reqsJSON), &opp.JobPosting.Requirements)

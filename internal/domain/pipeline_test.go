@@ -86,10 +86,12 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-1",
 			transitionID: "tr-1",
 			input: domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "  Staff Backend Engineer (Exploratory) ",
-				Priority:  "High",
-				Note:      "Warm intro from former colleague",
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "  Staff Backend Engineer (Exploratory) ",
+					Priority:  domain.PriorityHigh,
+				},
+				TransitionNote: "Warm intro from former colleague",
 			},
 			wantStage:      domain.StageDiscovered,
 			wantOutcome:    domain.OutcomeActive,
@@ -100,23 +102,25 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-2",
 			transitionID: "tr-2",
 			input: domain.OpportunityInput{
-				CompanyID:    "comp-1",
-				RoleTitle:    "Principal Distributed Systems Engineer",
-				Seniority:    "Principal",
-				Location:     "Remote (US)",
-				RemotePolicy: "Remote",
-				Priority:     "High",
-				Stage:        domain.StageApplied,
-				Outcome:      domain.OutcomeActive,
-				JobPosting: domain.JobPosting{
-					SourceURL:     "https://jobs.example.com/123",
-					RawText:       "Build distributed storage engines in Go.",
-					Requirements:  []string{"10+ years systems experience", "Go and Raft"},
-					TechStackTags: []string{"Go", "SQLite", "Raft"},
-					StatedMinComp: 220000,
-					StatedMaxComp: 260000,
-					Currency:      "USD",
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID:    "comp-1",
+					RoleTitle:    "Principal Distributed Systems Engineer",
+					Seniority:    "Principal",
+					Location:     "Remote (US)",
+					RemotePolicy: domain.RemotePolicyRemote,
+					Priority:     domain.PriorityHigh,
+					JobPosting: domain.JobPosting{
+						SourceURL:     "https://jobs.example.com/123",
+						RawText:       "Build distributed storage engines in Go.",
+						Requirements:  []string{"10+ years systems experience", "Go and Raft"},
+						TechStackTags: []string{"Go", "SQLite", "Raft"},
+						StatedMinComp: 220000,
+						StatedMaxComp: 260000,
+						Currency:      "USD",
+					},
 				},
+				Stage:   domain.StageApplied,
+				Outcome: domain.OutcomeActive,
 			},
 			wantStage:      domain.StageApplied,
 			wantOutcome:    domain.OutcomeActive,
@@ -127,7 +131,9 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-3",
 			transitionID: "tr-3",
 			input: domain.OpportunityInput{
-				RoleTitle: "Engineer",
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					RoleTitle: "Engineer",
+				},
 			},
 			wantErr: domain.ErrValidation,
 		},
@@ -136,8 +142,10 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-4",
 			transitionID: "tr-4",
 			input: domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "   ",
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "   ",
+				},
 			},
 			wantErr: domain.ErrValidation,
 		},
@@ -146,9 +154,11 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-5",
 			transitionID: "tr-5",
 			input: domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "Engineer",
-				Stage:     domain.Stage("PhoneScreen"),
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "Engineer",
+				},
+				Stage: domain.Stage("PhoneScreen"),
 			},
 			wantErr: domain.ErrValidation,
 		},
@@ -157,9 +167,11 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-6",
 			transitionID: "tr-6",
 			input: domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "Engineer",
-				Outcome:   domain.Outcome("Archived"),
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "Engineer",
+				},
+				Outcome: domain.Outcome("Archived"),
 			},
 			wantErr: domain.ErrValidation,
 		},
@@ -168,11 +180,39 @@ func TestNewOpportunity(t *testing.T) {
 			id:           "opp-7",
 			transitionID: "tr-7",
 			input: domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "Engineer",
-				JobPosting: domain.JobPosting{
-					StatedMinComp: 300000,
-					StatedMaxComp: 200000,
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "Engineer",
+					JobPosting: domain.JobPosting{
+						StatedMinComp: 300000,
+						StatedMaxComp: 200000,
+					},
+				},
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name:         "rejects non-canonical priority",
+			id:           "opp-8",
+			transitionID: "tr-8",
+			input: domain.OpportunityInput{
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "Engineer",
+					Priority:  domain.Priority("Urgent"),
+				},
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name:         "rejects non-canonical remote policy",
+			id:           "opp-9",
+			transitionID: "tr-9",
+			input: domain.OpportunityInput{
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID:    "comp-1",
+					RoleTitle:    "Engineer",
+					RemotePolicy: domain.RemotePolicy("Anywhere"),
 				},
 			},
 			wantErr: domain.ErrValidation,
@@ -290,10 +330,12 @@ func TestOpportunity_Transition(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			opp, _, err := domain.NewOpportunity("opp-1", "tr-init", domain.OpportunityInput{
-				CompanyID: "comp-1",
-				RoleTitle: "Staff Engineer",
-				Stage:     tc.initialStage,
-				Outcome:   tc.initialOutcome,
+				OpportunityDetailsInput: domain.OpportunityDetailsInput{
+					CompanyID: "comp-1",
+					RoleTitle: "Staff Engineer",
+				},
+				Stage:   tc.initialStage,
+				Outcome: tc.initialOutcome,
 			}, createdAt)
 			if err != nil {
 				t.Fatalf("setup failed: %v", err)
@@ -333,8 +375,10 @@ func TestOpportunity_UpdateDetailsPreservesLastActivityAt(t *testing.T) {
 	editedAt := time.Date(2026, 10, 24, 15, 0, 0, 0, time.UTC)
 
 	opp, _, err := domain.NewOpportunity("opp-1", "tr-1", domain.OpportunityInput{
-		CompanyID: "comp-1",
-		RoleTitle: "Exploratory Backend Role",
+		OpportunityDetailsInput: domain.OpportunityDetailsInput{
+			CompanyID: "comp-1",
+			RoleTitle: "Exploratory Backend Role",
+		},
 	}, createdAt)
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
@@ -345,8 +389,8 @@ func TestOpportunity_UpdateDetailsPreservesLastActivityAt(t *testing.T) {
 		RoleTitle:    "Staff Backend Engineer",
 		Seniority:    "Staff",
 		Location:     "New York, NY",
-		RemotePolicy: "Hybrid",
-		Priority:     "High",
+		RemotePolicy: domain.RemotePolicyHybrid,
+		Priority:     domain.PriorityHigh,
 		Notes:        "Attached formal job posting after chat",
 		JobPosting: domain.JobPosting{
 			SourceURL:     "https://boards.greenhouse.io/acme/jobs/999",
@@ -401,6 +445,20 @@ func TestOpportunityFilter_Validate(t *testing.T) {
 			name: "rejects invalid outcome filter",
 			filter: domain.OpportunityFilter{
 				Outcome: domain.Outcome("InvalidOutcome"),
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects invalid priority filter",
+			filter: domain.OpportunityFilter{
+				Priority: domain.Priority("InvalidPriority"),
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects invalid remote policy filter",
+			filter: domain.OpportunityFilter{
+				RemotePolicy: domain.RemotePolicy("InvalidRemotePolicy"),
 			},
 			wantErr: domain.ErrValidation,
 		},

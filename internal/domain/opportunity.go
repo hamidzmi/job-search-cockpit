@@ -12,8 +12,8 @@ type Opportunity struct {
 	RoleTitle      string
 	Seniority      string
 	Location       string
-	RemotePolicy   string
-	Priority       string
+	RemotePolicy   RemotePolicy
+	Priority       Priority
 	Stage          Stage
 	Outcome        Outcome
 	Notes          string
@@ -23,29 +23,22 @@ type Opportunity struct {
 	UpdatedAt      time.Time
 }
 
-type OpportunityInput struct {
-	CompanyID    string
-	RoleTitle    string
-	Seniority    string
-	Location     string
-	RemotePolicy string
-	Priority     string
-	Stage        Stage
-	Outcome      Outcome
-	Notes        string
-	Note         string
-	JobPosting   JobPosting
-}
-
 type OpportunityDetailsInput struct {
 	CompanyID    string
 	RoleTitle    string
 	Seniority    string
 	Location     string
-	RemotePolicy string
-	Priority     string
+	RemotePolicy RemotePolicy
+	Priority     Priority
 	Notes        string
 	JobPosting   JobPosting
+}
+
+type OpportunityInput struct {
+	OpportunityDetailsInput
+	Stage          Stage
+	Outcome        Outcome
+	TransitionNote string
 }
 
 type StageTransition struct {
@@ -96,9 +89,17 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 		return Opportunity{}, StageTransition{}, err
 	}
 
-	priority := strings.TrimSpace(in.Priority)
+	priority := Priority(strings.TrimSpace(string(in.Priority)))
 	if priority == "" {
-		priority = "Medium"
+		priority = PriorityMedium
+	}
+	if !priority.IsValid() {
+		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: invalid priority %q", ErrValidation, priority)
+	}
+
+	remotePolicy := RemotePolicy(strings.TrimSpace(string(in.RemotePolicy)))
+	if remotePolicy != "" && !remotePolicy.IsValid() {
+		return Opportunity{}, StageTransition{}, fmt.Errorf("%w: invalid remote policy %q", ErrValidation, remotePolicy)
 	}
 
 	ts := now.UTC()
@@ -108,7 +109,7 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 		RoleTitle:      roleTitle,
 		Seniority:      strings.TrimSpace(in.Seniority),
 		Location:       strings.TrimSpace(in.Location),
-		RemotePolicy:   strings.TrimSpace(in.RemotePolicy),
+		RemotePolicy:   remotePolicy,
 		Priority:       priority,
 		Stage:          stage,
 		Outcome:        outcome,
@@ -126,7 +127,7 @@ func NewOpportunity(id, transitionID string, in OpportunityInput, now time.Time)
 		ToStage:        stage,
 		FromOutcome:    "",
 		ToOutcome:      outcome,
-		Note:           strings.TrimSpace(in.Note),
+		Note:           strings.TrimSpace(in.TransitionNote),
 		TransitionedAt: ts,
 	}
 
@@ -146,16 +147,23 @@ func (o *Opportunity) UpdateDetails(in OpportunityDetailsInput, now time.Time) e
 	if err != nil {
 		return err
 	}
-	priority := strings.TrimSpace(in.Priority)
+	priority := Priority(strings.TrimSpace(string(in.Priority)))
 	if priority == "" {
 		priority = o.Priority
+	}
+	if !priority.IsValid() {
+		return fmt.Errorf("%w: invalid priority %q", ErrValidation, priority)
+	}
+	remotePolicy := RemotePolicy(strings.TrimSpace(string(in.RemotePolicy)))
+	if remotePolicy != "" && !remotePolicy.IsValid() {
+		return fmt.Errorf("%w: invalid remote policy %q", ErrValidation, remotePolicy)
 	}
 
 	o.CompanyID = companyID
 	o.RoleTitle = roleTitle
 	o.Seniority = strings.TrimSpace(in.Seniority)
 	o.Location = strings.TrimSpace(in.Location)
-	o.RemotePolicy = strings.TrimSpace(in.RemotePolicy)
+	o.RemotePolicy = remotePolicy
 	o.Priority = priority
 	o.Notes = strings.TrimSpace(in.Notes)
 	o.JobPosting = jp

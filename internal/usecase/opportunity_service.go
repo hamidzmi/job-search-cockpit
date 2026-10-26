@@ -36,8 +36,7 @@ func NewOpportunityService(
 func (s *OpportunityService) CreateOpportunity(ctx context.Context, in domain.OpportunityInput) (domain.OpportunityView, error) {
 	var created domain.OpportunityView
 	err := s.tx.WithinTransaction(ctx, func(txCtx context.Context) error {
-		company, err := s.companies.GetCompany(txCtx, in.CompanyID)
-		if err != nil {
+		if _, err := s.companies.GetCompany(txCtx, in.CompanyID); err != nil {
 			return err
 		}
 		opp, tr, err := domain.NewOpportunity(uuid.NewString(), uuid.NewString(), in, s.clock.Now())
@@ -50,10 +49,11 @@ func (s *OpportunityService) CreateOpportunity(ctx context.Context, in domain.Op
 		if err := s.transitions.AppendStageTransition(txCtx, tr); err != nil {
 			return err
 		}
-		created = domain.OpportunityView{
-			Opportunity: opp,
-			CompanyName: company.Name,
+		view, err := s.opps.GetOpportunityView(txCtx, opp.ID)
+		if err != nil {
+			return err
 		}
+		created = view
 		return nil
 	})
 	if err != nil {
