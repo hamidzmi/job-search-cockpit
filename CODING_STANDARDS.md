@@ -1,5 +1,13 @@
 # Coding Standards
 
+## Design Principles (SOLID, KISS, DRY)
+
+- **SOLID**:
+  - **Single Responsibility (SRP)**: Give each file, struct, service, and React component one reason to change (e.g., separate `company_handler.go`, `opportunity_handler.go`, `opportunity_dto.go`, `company_repo.go`, `opportunity_repo.go`).
+  - **Interface Segregation & Dependency Inversion (ISP / DIP)**: Keep inbound and outbound port interfaces narrow and role-focused, defined by the consumer in `internal/usecase/port/{inbound,outbound}` and implemented in `internal/adapter/<tech>`.
+- **KISS (Keep It Simple)**: Favor direct, readable domain methods, straightforward SQL queries, and minimal state. Build only what the current ticket/spec requires without speculative abstractions or unused helpers.
+- **DRY (Don't Repeat Yourself)**: Keep each domain invariant, validation rule, struct field group, SQL row hydration, and UI form field group in a single authoritative place; embed or extract shared helpers instead of duplicating logic across create/update paths.
+
 ## Architecture & Module Boundaries (ADR-0003)
 
 - **`internal/domain`**: Pure Go entities, read-model projections (`*View`), value objects, typed domain errors, and pure domain evaluators. Import only the Go standard library; keep struct fields free of `json:` or `db:` tags.

@@ -9,4 +9,5 @@ import (
 type StageTransitionRepository interface {
 	AppendStageTransition(ctx context.Context, tr domain.StageTransition) error
 	ListStageTransitions(ctx context.Context, opportunityID string) ([]domain.StageTransition, error)
+	ListAllStageTransitions(ctx context.Context) ([]domain.StageTransition, error)
 }

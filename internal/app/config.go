@@ -28,3 +28,8 @@ func LoadConfigFromEnv() Config {
 func (c Config) DBPath() string {
 	return filepath.Join(c.DataDir, "cockpit.db")
 }
+
+func (c Config) ArtifactsDir() string {
+	return filepath.Join(c.DataDir, "artifacts")
+}
+

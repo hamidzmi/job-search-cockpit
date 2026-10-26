@@ -4,7 +4,7 @@ Repo root: `/Users/hamid/Projects/Job-Search-Cockpit`.
 
 ### Coding standards
 
-Clean Architecture layer rules, single-responsibility file & port layout, `internal/app` composition root, table-driven tests, and UTC/local timestamp rules. See `CODING_STANDARDS.md`.
+SOLID, KISS, and DRY principles, Clean Architecture layer rules, single-responsibility file & port layout, `internal/app` composition root, table-driven tests, and UTC/local timestamp rules. See `CODING_STANDARDS.md`.
 
 ### Issue tracker
 

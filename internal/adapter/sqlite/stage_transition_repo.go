@@ -21,6 +21,9 @@ func (s *Store) AppendStageTransition(ctx context.Context, tr domain.StageTransi
 }
 
 func (s *Store) ListStageTransitions(ctx context.Context, opportunityID string) ([]domain.StageTransition, error) {
+	if opportunityID == "" {
+		return s.ListAllStageTransitions(ctx)
+	}
 	rows, err := s.exec(ctx).QueryContext(ctx, `
 		SELECT id, opportunity_id, from_stage, to_stage, from_outcome, to_outcome, note, transitioned_at
 		FROM stage_transitions
@@ -34,20 +37,53 @@ func (s *Store) ListStageTransitions(ctx context.Context, opportunityID string) 
 
 	var result []domain.StageTransition
 	for rows.Next() {
-		var tr domain.StageTransition
-		var fromStage, toStage, fromOutcome, toOutcome, tsStr string
-		if err := rows.Scan(&tr.ID, &tr.OpportunityID, &fromStage, &toStage, &fromOutcome, &toOutcome, &tr.Note, &tsStr); err != nil {
+		tr, err := scanStageTransition(rows)
+		if err != nil {
 			return nil, err
 		}
-		tr.FromStage = domain.Stage(fromStage)
-		tr.ToStage = domain.Stage(toStage)
-		tr.FromOutcome = domain.Outcome(fromOutcome)
-		tr.ToOutcome = domain.Outcome(toOutcome)
-		tr.TransitionedAt, _ = time.Parse(time.RFC3339Nano, tsStr)
 		result = append(result, tr)
 	}
 	if result == nil {
 		result = []domain.StageTransition{}
 	}
 	return result, rows.Err()
+}
+
+func (s *Store) ListAllStageTransitions(ctx context.Context) ([]domain.StageTransition, error) {
+	rows, err := s.exec(ctx).QueryContext(ctx, `
+		SELECT id, opportunity_id, from_stage, to_stage, from_outcome, to_outcome, note, transitioned_at
+		FROM stage_transitions
+		ORDER BY transitioned_at ASC, rowid ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.StageTransition
+	for rows.Next() {
+		tr, err := scanStageTransition(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, tr)
+	}
+	if result == nil {
+		result = []domain.StageTransition{}
+	}
+	return result, rows.Err()
+}
+
+func scanStageTransition(s scanner) (domain.StageTransition, error) {
+	var tr domain.StageTransition
+	var fromStage, toStage, fromOutcome, toOutcome, tsStr string
+	if err := s.Scan(&tr.ID, &tr.OpportunityID, &fromStage, &toStage, &fromOutcome, &toOutcome, &tr.Note, &tsStr); err != nil {
+		return domain.StageTransition{}, err
+	}
+	tr.FromStage = domain.Stage(fromStage)
+	tr.ToStage = domain.Stage(toStage)
+	tr.FromOutcome = domain.Outcome(fromOutcome)
+	tr.ToOutcome = domain.Outcome(toOutcome)
+	tr.TransitionedAt, _ = time.Parse(time.RFC3339Nano, tsStr)
+	return tr, nil
 }

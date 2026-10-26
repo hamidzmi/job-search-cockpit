@@ -6,11 +6,20 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CockpitApiProvider } from '../../../api/CockpitApiContext';
 import type {
+  ActionItem,
+  ActionItemCreateInput,
+  ActionItemUpdateInput,
   Company,
   CompanyUpsertInput,
+  Contact,
+  ContactUpsertInput,
+  Interaction,
+  InteractionCreateInput,
   JobPosting,
   JobPostingInput,
   Opportunity,
+  OpportunityContact,
+  OpportunityContactLinkInput,
   OpportunityCreateInput,
   OpportunityTransitionInput,
   OpportunityUpdateInput,
@@ -46,6 +55,10 @@ function installStubbedHttpHandlers(seed?: {
   const transitionsByOpp: Record<string, StageTransition[]> = {
     ...(seed?.transitions ?? {}),
   };
+  const contacts: Contact[] = [];
+  const oppContacts: OpportunityContact[] = [];
+  const interactions: Interaction[] = [];
+  const actionItems: ActionItem[] = [];
   let idCounter = 100;
   let tick = 1;
   const nextIso = () => {
@@ -250,6 +263,303 @@ function installStubbedHttpHandlers(seed?: {
       };
       opportunities[idx] = updated;
       return jsonResponse(updated);
+    }
+
+    if (url.pathname === '/api/contacts' && method === 'GET') {
+      const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+      const warmth = url.searchParams.get('warmth') ?? '';
+      const companyId = url.searchParams.get('company_id') ?? '';
+      const enriched = contacts
+        .map((c) => ({
+          ...c,
+          linked_opportunities: oppContacts
+            .filter((oc) => oc.contact_id === c.id)
+            .map((oc) => {
+              const opp = opportunities.find((o) => o.id === oc.opportunity_id);
+              return {
+                opportunity_id: oc.opportunity_id,
+                company_id: opp?.company_id ?? '',
+                company_name: opp?.company_name ?? '',
+                role_title: opp?.role_title ?? '',
+                stage: opp?.stage ?? 'Discovered',
+                outcome: opp?.outcome ?? 'Active',
+                role: oc.role,
+                notes: oc.notes,
+                linked_at: oc.linked_at,
+              };
+            }),
+        }))
+        .filter((c) => {
+          if (warmth && c.warmth !== warmth) return false;
+          if (companyId && c.company_id !== companyId) return false;
+          if (q) {
+            const hay = [c.name, c.title, c.email, c.notes, c.company_name]
+              .join(' ')
+              .toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+      return jsonResponse(enriched);
+    }
+
+    if (url.pathname === '/api/contacts' && method === 'POST') {
+      const payload = JSON.parse(bodyText) as ContactUpsertInput;
+      const now = nextIso();
+      const company = companies.find((c) => c.id === payload.company_id);
+      const created: Contact = {
+        id: `cnt-${++idCounter}`,
+        company_id: payload.company_id,
+        company_name: company?.name ?? '',
+        name: payload.name,
+        title: payload.title,
+        email: payload.email,
+        linkedin_url: payload.linkedin_url,
+        warmth: payload.warmth,
+        notes: payload.notes,
+        linked_opportunities: [],
+        created_at: now,
+        updated_at: now,
+      };
+      contacts.push(created);
+      return jsonResponse(created, 201);
+    }
+
+    const contactMatch = url.pathname.match(/^\/api\/contacts\/([^/]+)$/);
+    if (contactMatch && method === 'PUT') {
+      const id = decodeURIComponent(contactMatch[1]);
+      const idx = contacts.findIndex((c) => c.id === id);
+      if (idx === -1) {
+        return jsonResponse({ error: { code: 'not_found', message: 'not found' } }, 404);
+      }
+      const payload = JSON.parse(bodyText) as ContactUpsertInput;
+      const company = companies.find((c) => c.id === payload.company_id);
+      const updated: Contact = {
+        ...contacts[idx],
+        ...payload,
+        company_name: company?.name ?? '',
+        updated_at: nextIso(),
+      };
+      contacts[idx] = updated;
+      return jsonResponse(updated);
+    }
+
+    const oppContactsMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/contacts$/);
+    if (oppContactsMatch && method === 'GET') {
+      const oppId = decodeURIComponent(oppContactsMatch[1]);
+      return jsonResponse(oppContacts.filter((oc) => oc.opportunity_id === oppId));
+    }
+
+    if (oppContactsMatch && method === 'POST') {
+      const oppId = decodeURIComponent(oppContactsMatch[1]);
+      const payload = JSON.parse(bodyText) as OpportunityContactLinkInput;
+      const contact = contacts.find((c) => c.id === payload.contact_id);
+      if (!contact) {
+        return jsonResponse({ error: { code: 'not_found', message: 'contact not found' } }, 404);
+      }
+      const linked: OpportunityContact = {
+        opportunity_id: oppId,
+        contact_id: contact.id,
+        role: payload.role,
+        notes: payload.notes ?? '',
+        linked_at: nextIso(),
+        company_id: contact.company_id,
+        company_name: contact.company_name,
+        name: contact.name,
+        title: contact.title,
+        email: contact.email,
+        linkedin_url: contact.linkedin_url,
+        warmth: contact.warmth,
+        contact_notes: contact.notes,
+      };
+      const existingIdx = oppContacts.findIndex(
+        (oc) => oc.opportunity_id === oppId && oc.contact_id === contact.id,
+      );
+      if (existingIdx >= 0) {
+        oppContacts[existingIdx] = linked;
+      } else {
+        oppContacts.push(linked);
+      }
+      return jsonResponse(linked, 201);
+    }
+
+    const oppContactUnlinkMatch = url.pathname.match(
+      /^\/api\/opportunities\/([^/]+)\/contacts\/([^/]+)$/,
+    );
+    if (oppContactUnlinkMatch && method === 'DELETE') {
+      const oppId = decodeURIComponent(oppContactUnlinkMatch[1]);
+      const contactId = decodeURIComponent(oppContactUnlinkMatch[2]);
+      const idx = oppContacts.findIndex(
+        (oc) => oc.opportunity_id === oppId && oc.contact_id === contactId,
+      );
+      if (idx >= 0) oppContacts.splice(idx, 1);
+      return new Response(null, { status: 204 });
+    }
+
+    if (url.pathname === '/api/interactions' && method === 'GET') {
+      const contactId = url.searchParams.get('contact_id') ?? '';
+      const oppId = url.searchParams.get('opportunity_id') ?? '';
+      return jsonResponse(
+        interactions.filter((i) => {
+          if (contactId && i.contact_id !== contactId) return false;
+          if (oppId && i.opportunity_id !== oppId) return false;
+          return true;
+        }),
+      );
+    }
+
+    if (url.pathname === '/api/interactions' && method === 'POST') {
+      const payload = JSON.parse(bodyText) as InteractionCreateInput;
+      const now = nextIso();
+      const contact = contacts.find((c) => c.id === payload.contact_id);
+      const opp = opportunities.find((o) => o.id === payload.opportunity_id);
+      const occurredAt = payload.occurred_at ?? now;
+      if (opp) {
+        opp.last_activity_at = occurredAt;
+        opp.updated_at = now;
+      }
+      const createdInteraction: Interaction = {
+        id: `int-${++idCounter}`,
+        contact_id: payload.contact_id,
+        contact_name: contact?.name ?? '',
+        opportunity_id: payload.opportunity_id ?? '',
+        opportunity_role_title: opp?.role_title ?? '',
+        company_name: opp?.company_name ?? contact?.company_name ?? '',
+        kind: payload.kind,
+        direction: payload.direction,
+        occurred_at: occurredAt,
+        summary: payload.summary,
+        created_at: now,
+      };
+      interactions.unshift(createdInteraction);
+
+      let followUpActionItem: ActionItem | undefined;
+      if (payload.follow_up) {
+        followUpActionItem = {
+          id: `ai-${++idCounter}`,
+          title: payload.follow_up.title,
+          opportunity_id: payload.opportunity_id ?? '',
+          opportunity_role_title: opp?.role_title ?? '',
+          contact_id: payload.contact_id,
+          contact_name: contact?.name ?? '',
+          company_name: opp?.company_name ?? contact?.company_name ?? '',
+          due_at: payload.follow_up.due_at,
+          status: 'open',
+          notes: payload.follow_up.notes ?? '',
+          created_at: now,
+          updated_at: now,
+        };
+        actionItems.push(followUpActionItem);
+      }
+      return jsonResponse(
+        {
+          interaction: createdInteraction,
+          follow_up_action_item: followUpActionItem,
+        },
+        201,
+      );
+    }
+
+    if (url.pathname === '/api/action-items' && method === 'GET') {
+      const status = url.searchParams.get('status') ?? '';
+      const oppId = url.searchParams.get('opportunity_id') ?? '';
+      const contactId = url.searchParams.get('contact_id') ?? '';
+      return jsonResponse(
+        actionItems.filter((a) => {
+          if (status && a.status !== status) return false;
+          if (oppId && a.opportunity_id !== oppId) return false;
+          if (contactId && a.contact_id !== contactId) return false;
+          return true;
+        }),
+      );
+    }
+
+    if (url.pathname === '/api/action-items' && method === 'POST') {
+      const payload = JSON.parse(bodyText) as ActionItemCreateInput;
+      const now = nextIso();
+      const contact = contacts.find((c) => c.id === payload.contact_id);
+      const opp = opportunities.find((o) => o.id === payload.opportunity_id);
+      const created: ActionItem = {
+        id: `ai-${++idCounter}`,
+        title: payload.title,
+        opportunity_id: payload.opportunity_id ?? '',
+        opportunity_role_title: opp?.role_title ?? '',
+        contact_id: payload.contact_id ?? '',
+        contact_name: contact?.name ?? '',
+        company_name: opp?.company_name ?? contact?.company_name ?? '',
+        due_at: payload.due_at,
+        status: 'open',
+        notes: payload.notes ?? '',
+        created_at: now,
+        updated_at: now,
+      };
+      actionItems.push(created);
+      return jsonResponse(created, 201);
+    }
+
+    const actionItemMatch = url.pathname.match(/^\/api\/action-items\/([^/]+)$/);
+    if (actionItemMatch && method === 'PUT') {
+      const id = decodeURIComponent(actionItemMatch[1]);
+      const idx = actionItems.findIndex((a) => a.id === id);
+      if (idx === -1) {
+        return jsonResponse({ error: { code: 'not_found', message: 'not found' } }, 404);
+      }
+      const payload = JSON.parse(bodyText) as ActionItemUpdateInput;
+      const updated: ActionItem = {
+        ...actionItems[idx],
+        title: payload.title,
+        due_at: payload.due_at,
+        status: payload.status,
+        notes: payload.notes ?? actionItems[idx].notes,
+        updated_at: nextIso(),
+      };
+      actionItems[idx] = updated;
+      return jsonResponse(updated);
+    }
+
+    if (url.pathname === '/api/stories' && method === 'GET') {
+      return jsonResponse([]);
+    }
+
+    if (url.pathname === '/api/settings/ai' && method === 'GET') {
+      return jsonResponse({
+        provider: 'openrouter',
+        base_url: '',
+        api_key: '',
+        has_api_key: false,
+        is_configured: false,
+        fast_extraction_model: '',
+        reasoning_tailoring_model: '',
+        bookmarked_models: [],
+        updated_at: nextIso(),
+      });
+    }
+
+    const fitMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/fit-assessment$/);
+    if (fitMatch && method === 'GET') {
+      const oppId = decodeURIComponent(fitMatch[1]);
+      return jsonResponse({
+        opportunity_id: oppId,
+        overall_score: 0,
+        overall_summary: '',
+        matched_strengths: [],
+        gaps_and_risks: [],
+        compensation_alignment: 'No compensation floor configured on Candidate Profile.',
+        recommended_story_ids: [],
+        recommended_stories: [],
+        model_used: '',
+        updated_at: '',
+      });
+    }
+
+    const artifactsMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/artifacts$/);
+    if (artifactsMatch && method === 'GET') {
+      return jsonResponse([]);
+    }
+
+    const roundsMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/rounds$/);
+    if (roundsMatch && method === 'GET') {
+      return jsonResponse([]);
     }
 
     return jsonResponse({ error: { code: 'not_found', message: `unhandled ${method} ${url.pathname}` } }, 404);
@@ -562,5 +872,196 @@ describe('Pipeline Spine Workspace Views (over /api/* HTTP handlers)', () => {
     expect(screen.getByTestId('detail-last-activity').textContent).not.toBe(
       initialLastActivityText,
     );
+  });
+
+  it('manages global Contacts in /network, links Contacts with roles across multiple Opportunities, logs Interactions with follow-up Action Items, and completes/dismisses Action Items', async () => {
+    const user = userEvent.setup();
+    installStubbedHttpHandlers({
+      companies: [
+        {
+          id: 'comp-1',
+          name: 'Stripe',
+          domain: 'stripe.com',
+          headquarters: 'San Francisco, CA',
+          remote_policy: 'Hybrid',
+          size_stage: 'Late Stage',
+          notes: '',
+          created_at: '2026-10-20T09:00:00Z',
+          updated_at: '2026-10-20T09:00:00Z',
+        },
+      ],
+      opportunities: [
+        {
+          id: 'opp-1',
+          company_id: 'comp-1',
+          company_name: 'Stripe',
+          role_title: 'Staff Core Payments Engineer',
+          seniority: 'Staff',
+          location: 'Remote',
+          remote_policy: 'Remote',
+          priority: 'High',
+          stage: 'Outreach',
+          outcome: 'Active',
+          notes: '',
+          job_posting: {
+            source_url: '',
+            raw_text: '',
+            requirements: [],
+            tech_stack_tags: ['Go'],
+            stated_min_comp: 0,
+            stated_max_comp: 0,
+            currency: 'USD',
+            has_content: true,
+          },
+          last_activity_at: '2026-10-20T09:00:00Z',
+          created_at: '2026-10-20T09:00:00Z',
+          updated_at: '2026-10-20T09:00:00Z',
+        },
+        {
+          id: 'opp-2',
+          company_id: 'comp-1',
+          company_name: 'Stripe',
+          role_title: 'Principal Ledger Architect',
+          seniority: 'Principal',
+          location: 'Seattle, WA',
+          remote_policy: 'Hybrid',
+          priority: 'High',
+          stage: 'Interviewing',
+          outcome: 'Active',
+          notes: '',
+          job_posting: {
+            source_url: '',
+            raw_text: '',
+            requirements: [],
+            tech_stack_tags: ['Go'],
+            stated_min_comp: 0,
+            stated_max_comp: 0,
+            currency: 'USD',
+            has_content: true,
+          },
+          last_activity_at: '2026-10-20T09:00:00Z',
+          created_at: '2026-10-20T09:00:00Z',
+          updated_at: '2026-10-20T09:00:00Z',
+        },
+      ],
+    });
+
+    renderCockpit(['/network']);
+
+    // 1. Create a global Contact in Network & Companies workspace
+    await user.click(await screen.findByRole('button', { name: '+ New Contact' }));
+    const contactDialog = screen.getByRole('dialog', { name: 'New Contact' });
+    await user.type(within(contactDialog).getByLabelText(/Contact Name/i), 'Alice Chen');
+    await user.selectOptions(within(contactDialog).getByLabelText(/Current Company/i), 'comp-1');
+    await user.type(within(contactDialog).getByLabelText(/Title \/ Role/i), 'Staff Payments Engineer');
+    await user.type(within(contactDialog).getByLabelText(/Email/i), 'alice@stripe.com');
+    await user.selectOptions(within(contactDialog).getByLabelText(/Warmth Level/i), 'Advocate');
+    await user.type(within(contactDialog).getByLabelText(/Contact Notes/i), 'Former colleague');
+    await user.click(within(contactDialog).getByRole('button', { name: 'Create Contact' }));
+
+    expect(await screen.findByRole('heading', { name: 'Alice Chen' })).toBeInTheDocument();
+    expect(screen.getByText('Staff Payments Engineer')).toBeInTheDocument();
+
+    // 2. Link Alice to Principal Ledger Architect (opp-2) as Champion directly from the Contact card in /network
+    const aliceCard = screen.getByRole('article', { name: /Contact: Alice Chen/i });
+    await user.selectOptions(
+      within(aliceCard).getByLabelText('Link Opportunity for Alice Chen'),
+      'opp-2',
+    );
+    await user.selectOptions(
+      within(aliceCard).getByLabelText('Stakeholder Role for Alice Chen'),
+      'Champion',
+    );
+    await user.click(within(aliceCard).getByRole('button', { name: 'Link to Opportunity' }));
+
+    expect(
+      await within(aliceCard).findByRole('link', { name: 'Principal Ledger Architect' }),
+    ).toBeInTheDocument();
+    expect(within(aliceCard).getByText('Linked Opportunities (1)')).toBeInTheDocument();
+
+    // 3. Filter contacts in /network by search query
+    const searchInput = screen.getByLabelText('Search Contacts');
+    await user.type(searchInput, 'NonExistentPerson');
+    expect(screen.queryByRole('heading', { name: 'Alice Chen' })).not.toBeInTheDocument();
+    await user.clear(searchInput);
+    expect(await screen.findByRole('heading', { name: 'Alice Chen' })).toBeInTheDocument();
+
+    // 4. Navigate to Opportunity 1 (/opportunities/opp-1) and link Alice as Referrer
+    await user.click(screen.getByRole('link', { name: 'Staff Core Payments Engineer' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Staff Core Payments Engineer' }),
+    ).toBeInTheDocument();
+
+    const initialLastActivity = screen.getByTestId('detail-last-activity').textContent;
+
+    const contactsSection = screen.getByRole('region', {
+      name: 'Opportunity Contacts and Interactions',
+    });
+    await user.selectOptions(
+      within(contactsSection).getByLabelText('Select Contact to Link'),
+      'cnt-101',
+    );
+    await user.selectOptions(
+      within(contactsSection).getByLabelText('Stakeholder Role'),
+      'Referrer',
+    );
+    await user.click(within(contactsSection).getByRole('button', { name: 'Link Contact' }));
+
+    expect(
+      await within(contactsSection).findByText('Linked Stakeholders (1)'),
+    ).toBeInTheDocument();
+    expect(within(contactsSection).getByText('alice@stripe.com')).toBeInTheDocument();
+
+    // 5. Log an Interaction on Opportunity 1 with a follow-up Action Item and verify LastActivityAt advances
+    await user.selectOptions(
+      within(contactsSection).getByLabelText('Interaction Contact'),
+      'cnt-101',
+    );
+    await user.selectOptions(
+      within(contactsSection).getByLabelText('Interaction Kind'),
+      'Referral Request',
+    );
+    await user.selectOptions(
+      within(contactsSection).getByLabelText('Interaction Direction'),
+      'Outbound',
+    );
+    await user.type(
+      within(contactsSection).getByLabelText('Interaction Summary'),
+      'Sent tailored resume and asked for internal Stripe referral',
+    );
+    await user.click(
+      within(contactsSection).getByLabelText(/Schedule a follow-up Action Item/i),
+    );
+    await user.type(
+      within(contactsSection).getByLabelText('Follow-up Action Item Title'),
+      'Check in with Alice on referral status',
+    );
+    await user.type(
+      within(contactsSection).getByLabelText('Follow-up Due Date'),
+      '2026-10-29',
+    );
+    await user.click(within(contactsSection).getByRole('button', { name: 'Log Interaction' }));
+
+    expect(
+      await within(contactsSection).findByText(
+        'Sent tailored resume and asked for internal Stripe referral',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('detail-last-activity').textContent).not.toBe(initialLastActivity);
+
+    // 6. Verify follow-up Action Item is listed and can be completed/dismissed
+    const actionItemsSection = screen.getByRole('region', {
+      name: 'Opportunity Action Items',
+    });
+    expect(
+      await within(actionItemsSection).findByText('Check in with Alice on referral status'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(actionItemsSection).getByRole('button', {
+        name: 'Complete Check in with Alice on referral status',
+      }),
+    );
+    expect(await within(actionItemsSection).findByText('completed')).toBeInTheDocument();
   });
 });
