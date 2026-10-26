@@ -112,6 +112,9 @@ function setupTailoringWorkspaceTest() {
     if (url.pathname === '/api/opportunities/opp-1/contacts' && method === 'GET') {
       return jsonResponse([]);
     }
+    if (url.pathname === '/api/opportunities/opp-1/rounds' && method === 'GET') {
+      return jsonResponse([]);
+    }
     if (url.pathname === '/api/interactions' && method === 'GET') {
       return jsonResponse([]);
     }

@@ -557,6 +557,11 @@ function installStubbedHttpHandlers(seed?: {
       return jsonResponse([]);
     }
 
+    const roundsMatch = url.pathname.match(/^\/api\/opportunities\/([^/]+)\/rounds$/);
+    if (roundsMatch && method === 'GET') {
+      return jsonResponse([]);
+    }
+
     return jsonResponse({ error: { code: 'not_found', message: `unhandled ${method} ${url.pathname}` } }, 404);
   });
 

@@ -4,6 +4,10 @@ import { type AISettingsApi, defaultAISettingsApi } from './aiSettingsApi';
 import { type CompanyApi, defaultCompanyApi } from './companyApi';
 import { type ContactApi, defaultContactApi } from './contactApi';
 import { type InteractionApi, defaultInteractionApi } from './interactionApi';
+import {
+  type InterviewRoundApi,
+  defaultInterviewRoundApi,
+} from './interviewRoundApi';
 import { type OpportunityApi, defaultOpportunityApi } from './opportunityApi';
 import { type ProfileApi, defaultProfileApi } from './profileApi';
 import { type QuickCaptureApi, defaultQuickCaptureApi } from './quickCaptureApi';
@@ -20,6 +24,7 @@ export interface CockpitApi {
   contacts: ContactApi;
   interactions: InteractionApi;
   actionItems: ActionItemApi;
+  interviewRounds: InterviewRoundApi;
   tailoring: TailoringApi;
 }
 
@@ -33,6 +38,7 @@ const defaultCockpitApi: CockpitApi = {
   contacts: defaultContactApi,
   interactions: defaultInteractionApi,
   actionItems: defaultActionItemApi,
+  interviewRounds: defaultInterviewRoundApi,
   tailoring: defaultTailoringApi,
 };
 
