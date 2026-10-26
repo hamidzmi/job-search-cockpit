@@ -3,6 +3,10 @@ import { type ActionItemApi, defaultActionItemApi } from './actionItemApi';
 import { type CompanyApi, defaultCompanyApi } from './companyApi';
 import { type ContactApi, defaultContactApi } from './contactApi';
 import { type InteractionApi, defaultInteractionApi } from './interactionApi';
+import {
+  type InterviewRoundApi,
+  defaultInterviewRoundApi,
+} from './interviewRoundApi';
 import { type OpportunityApi, defaultOpportunityApi } from './opportunityApi';
 import { type ProfileApi, defaultProfileApi } from './profileApi';
 import { type StoryApi, defaultStoryApi } from './storyApi';
@@ -15,6 +19,7 @@ export interface CockpitApi {
   contacts: ContactApi;
   interactions: InteractionApi;
   actionItems: ActionItemApi;
+  interviewRounds: InterviewRoundApi;
 }
 
 const defaultCockpitApi: CockpitApi = {
@@ -25,6 +30,7 @@ const defaultCockpitApi: CockpitApi = {
   contacts: defaultContactApi,
   interactions: defaultInteractionApi,
   actionItems: defaultActionItemApi,
+  interviewRounds: defaultInterviewRoundApi,
 };
 
 const CockpitApiContext = createContext<CockpitApi>(defaultCockpitApi);

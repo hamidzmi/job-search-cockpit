@@ -374,3 +374,140 @@ export interface LogInteractionResponse {
   interaction: Interaction;
   follow_up_action_item?: ActionItem;
 }
+
+export const INTERVIEW_ROUND_TYPES = [
+  'Recruiter Screen',
+  'Founder Chat',
+  'Hiring Manager',
+  'Take-Home',
+  'Technical',
+  'System Design',
+  'Behavioral',
+  'Team Match',
+  'Executive',
+] as const;
+
+export type CanonicalInterviewRoundType = (typeof INTERVIEW_ROUND_TYPES)[number];
+
+export const INTERVIEW_ROUND_STATUSES = [
+  'Scheduled',
+  'Completed',
+  'Cancelled',
+] as const;
+
+export type InterviewRoundStatus = (typeof INTERVIEW_ROUND_STATUSES)[number];
+
+export interface StoryPriorRoundRef {
+  round_id: string;
+  round_order: number;
+  round_type: string;
+  title: string;
+}
+
+export interface InterviewRoundContact {
+  contact_id: string;
+  name: string;
+  title: string;
+  email: string;
+  warmth: ContactWarmth;
+  company_name: string;
+}
+
+export interface InterviewRoundStory {
+  story_id: string;
+  title: string;
+  hook: string;
+  competency_tags: string[];
+  skill_tags: string[];
+  used_in_earlier_rounds: StoryPriorRoundRef[];
+}
+
+export interface DebriefQuestion {
+  question: string;
+  category: string;
+  answered_with_story_id: string;
+  answered_with_story_title: string;
+  notes: string;
+}
+
+export interface DebriefQuestionInput {
+  question: string;
+  category: string;
+  answered_with_story_id: string;
+  notes: string;
+}
+
+export interface Debrief {
+  questions_asked: DebriefQuestion[];
+  went_well: string;
+  to_improve: string;
+  signals: string;
+  confidence_score: number;
+  follow_up_notes: string;
+  updated_at: string;
+}
+
+export interface DebriefUpsertInput {
+  questions_asked: DebriefQuestionInput[];
+  went_well: string;
+  to_improve: string;
+  signals: string;
+  confidence_score: number;
+  follow_up_notes: string;
+}
+
+export interface InterviewRound {
+  id: string;
+  opportunity_id: string;
+  round_order: number;
+  round_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: InterviewRoundStatus;
+  prep_notes: string;
+  contact_ids: string[];
+  story_ids: string[];
+  contacts: InterviewRoundContact[];
+  stories: InterviewRoundStory[];
+  debrief?: Debrief;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InterviewRoundUpsertInput {
+  round_order: number;
+  round_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: InterviewRoundStatus;
+  prep_notes: string;
+  contact_ids: string[];
+  story_ids: string[];
+}
+
+export interface QuestionBankFilter {
+  q?: string;
+  category?: string;
+  company_id?: string;
+  round_type?: string;
+  story_id?: string;
+}
+
+export interface QuestionBankEntry {
+  round_id: string;
+  opportunity_id: string;
+  opportunity_role_title: string;
+  company_id: string;
+  company_name: string;
+  round_order: number;
+  round_type: string;
+  round_title: string;
+  question: string;
+  category: string;
+  answered_with_story_id: string;
+  answered_with_story_title: string;
+  notes: string;
+  recorded_at: string;
+}

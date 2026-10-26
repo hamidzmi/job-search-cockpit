@@ -1,5 +1,6 @@
 import React from 'react';
 import { CandidateProfilePanel } from './CandidateProfilePanel';
+import { QuestionBankPanel } from './QuestionBankPanel';
 import { StoryBankPanel } from './StoryBankPanel';
 
 export function ProfileWorkspace() {
@@ -16,6 +17,7 @@ export function ProfileWorkspace() {
 
       <CandidateProfilePanel />
       <StoryBankPanel />
+      <QuestionBankPanel />
     </div>
   );
 }

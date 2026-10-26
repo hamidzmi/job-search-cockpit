@@ -27,6 +27,7 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 	contactSvc := usecase.NewContactService(store, store, store, store, clock)
 	interactionSvc := usecase.NewInteractionService(store, store, store, store, store, clock)
 	actionItemSvc := usecase.NewActionItemService(store, store, store, store, clock)
+	interviewRoundSvc := usecase.NewInterviewRoundService(store, store, store, store, store, clock)
 
 	return httpadapter.NewRouter(
 		httpadapter.NewCompanyHandler(companySvc),
@@ -36,5 +37,6 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 		httpadapter.NewContactHandler(contactSvc),
 		httpadapter.NewInteractionHandler(interactionSvc),
 		httpadapter.NewActionItemHandler(actionItemSvc),
+		httpadapter.NewInterviewRoundHandler(interviewRoundSvc),
 	)
 }
