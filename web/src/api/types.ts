@@ -672,3 +672,85 @@ export interface ArtifactDraft {
   content_markdown: string;
   model_used: string;
 }
+
+export const OFFER_STATUSES = [
+  'Pending',
+  'Negotiating',
+  'Accepted',
+  'Declined',
+  'Expired',
+] as const;
+
+export type OfferStatus = (typeof OFFER_STATUSES)[number];
+
+export interface Offer {
+  id: string;
+  opportunity_id: string;
+  base_salary: number;
+  bonus_target_pct: number;
+  bonus_amount: number;
+  equity_type: string;
+  equity_total_value: number;
+  equity_vesting_years: number;
+  sign_on_bonus: number;
+  currency: string;
+  deadline_at?: string;
+  benefits_notes: string;
+  negotiation_notes: string;
+  status: OfferStatus;
+  annual_bonus: number;
+  annual_equity: number;
+  recurring_total_comp: number;
+  year1_total_comp: number;
+  delta_vs_comp_floor: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfferView {
+  offer: Offer;
+  company_id: string;
+  company_name: string;
+  opportunity_role_title: string;
+  opportunity_stage: Stage;
+  opportunity_outcome: Outcome;
+  compensation_floor: number;
+}
+
+export interface OfferComparison {
+  compensation_floor: number;
+  target_compensation: number;
+  profile_currency: string;
+  offers: OfferView[];
+}
+
+export interface OfferUpsertInput {
+  base_salary: number;
+  bonus_target_pct: number;
+  bonus_amount: number;
+  equity_type: string;
+  equity_total_value: number;
+  equity_vesting_years: number;
+  sign_on_bonus: number;
+  currency: string;
+  deadline_at?: string;
+  benefits_notes: string;
+  negotiation_notes: string;
+  status: OfferStatus;
+}
+
+export interface StageFunnelMetrics {
+  stage: Stage;
+  reached_count: number;
+  conversion_from_previous_pct: number;
+  drop_off_count: number;
+  outcome_breakdown: Record<string, number>;
+  average_days_in_stage: number;
+}
+
+export interface FunnelAnalytics {
+  total_opportunities: number;
+  active_opportunities: number;
+  stages: StageFunnelMetrics[];
+}
+

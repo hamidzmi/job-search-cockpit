@@ -32,6 +32,22 @@ export function SettingsWorkspace() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
+  const seedMutation = useMutation({
+    mutationFn: () => api.backupAndSeed.seedSampleData(),
+    onSuccess: async () => {
+      setSeedMessage('Sample data successfully seeded! Opportunities, Companies, Stories, Contacts, and Offers are now loaded.');
+      setSeedError(null);
+      await queryClient.invalidateQueries();
+    },
+    onError: (err) => {
+      setSeedError(err instanceof Error ? err.message : 'Failed to seed sample data');
+      setSeedMessage(null);
+    },
+  });
+
   useEffect(() => {
     if (settingsQuery.data && !initialized) {
       setProvider(settingsQuery.data.provider);
@@ -343,6 +359,73 @@ export function SettingsWorkspace() {
                 </article>
               );
             })}
+          </div>
+        </section>
+
+        <section className="panel-card" aria-label="Local Workspace Backup">
+          <h3>Local Workspace Backup</h3>
+          <p className="panel-hint">
+            Export a full local snapshot of your Job Search Cockpit database and artifacts for offline archiving, migration, or safety.
+          </p>
+          <div className="backup-actions form-grid">
+            <div className="backup-card">
+              <h4>Structured JSON Snapshot</h4>
+              <p className="panel-hint">
+                Human-readable JSON containing all Companies, Opportunities, Transitions, Stories, Contacts, Interactions, Action Items, and Offers.
+              </p>
+              <a
+                href={api.backupAndSeed.getBackupExportUrl('json')}
+                className="btn-primary"
+                download="cockpit-backup.json"
+              >
+                Export JSON Backup
+              </a>
+            </div>
+
+            <div className="backup-card">
+              <h4>SQLite Database Snapshot</h4>
+              <p className="panel-hint">
+                Atomic, zero-lock binary snapshot created via SQLite VACUUM INTO for 100% database fidelity.
+              </p>
+              <a
+                href={api.backupAndSeed.getBackupExportUrl('sqlite')}
+                className="btn-secondary"
+                download="cockpit-backup.db"
+              >
+                Export SQLite (.db) Backup
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="panel-card" aria-label="Sample Data Seeding">
+          <h3>Sample Data Seeder</h3>
+          <p className="panel-hint">
+            Populate your local workspace with realistic demo data across target Companies, Opportunities with stage transitions, STAR Stories, Contacts, Interview Loops (with repeated story warnings &amp; debriefs), Action Items, and Offers.
+          </p>
+          {seedMessage && (
+            <div className="alert-success" role="status">
+              {seedMessage}
+            </div>
+          )}
+          {seedError && (
+            <div className="alert-error" role="alert">
+              {seedError}
+            </div>
+          )}
+          <div className="workspace-actions">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={seedMutation.isPending}
+              onClick={() => {
+                setSeedMessage(null);
+                setSeedError(null);
+                seedMutation.mutate();
+              }}
+            >
+              {seedMutation.isPending ? 'Seeding Data...' : 'Seed Sample Workspace Data'}
+            </button>
           </div>
         </section>
       </div>

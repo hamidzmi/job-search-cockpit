@@ -1,13 +1,11 @@
 import React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { AnalyticsWorkspace } from './features/analytics/AnalyticsWorkspace';
 import { NetworkWorkspace } from './features/network/NetworkWorkspace';
 import { OpportunityDetailWorkspace } from './features/pipeline/OpportunityDetailWorkspace';
 import { PipelineWorkspace } from './features/pipeline/PipelineWorkspace';
-import {
-  AnalyticsWorkspace,
-  FlightDeckWorkspace,
-} from './features/placeholders/WorkspacePlaceholders';
+import { FlightDeckWorkspace } from './features/placeholders/WorkspacePlaceholders';
 import { ProfileWorkspace } from './features/profile/ProfileWorkspace';
 import { SettingsWorkspace } from './features/settings/SettingsWorkspace';
 

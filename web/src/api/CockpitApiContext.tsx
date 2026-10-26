@@ -1,6 +1,11 @@
 import React, { createContext, useContext } from 'react';
 import { type ActionItemApi, defaultActionItemApi } from './actionItemApi';
 import { type AISettingsApi, defaultAISettingsApi } from './aiSettingsApi';
+import { type AnalyticsApi, defaultAnalyticsApi } from './analyticsApi';
+import {
+  type BackupAndSeedApi,
+  defaultBackupAndSeedApi,
+} from './backupAndSeedApi';
 import { type CompanyApi, defaultCompanyApi } from './companyApi';
 import { type ContactApi, defaultContactApi } from './contactApi';
 import { type InteractionApi, defaultInteractionApi } from './interactionApi';
@@ -8,6 +13,7 @@ import {
   type InterviewRoundApi,
   defaultInterviewRoundApi,
 } from './interviewRoundApi';
+import { type OfferApi, defaultOfferApi } from './offerApi';
 import { type OpportunityApi, defaultOpportunityApi } from './opportunityApi';
 import { type ProfileApi, defaultProfileApi } from './profileApi';
 import { type QuickCaptureApi, defaultQuickCaptureApi } from './quickCaptureApi';
@@ -26,6 +32,9 @@ export interface CockpitApi {
   actionItems: ActionItemApi;
   interviewRounds: InterviewRoundApi;
   tailoring: TailoringApi;
+  offers: OfferApi;
+  analytics: AnalyticsApi;
+  backupAndSeed: BackupAndSeedApi;
 }
 
 const defaultCockpitApi: CockpitApi = {
@@ -40,6 +49,9 @@ const defaultCockpitApi: CockpitApi = {
   actionItems: defaultActionItemApi,
   interviewRounds: defaultInterviewRoundApi,
   tailoring: defaultTailoringApi,
+  offers: defaultOfferApi,
+  analytics: defaultAnalyticsApi,
+  backupAndSeed: defaultBackupAndSeedApi,
 };
 
 const CockpitApiContext = createContext<CockpitApi>(defaultCockpitApi);

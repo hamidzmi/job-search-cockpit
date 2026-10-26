@@ -50,6 +50,10 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 	interviewRoundSvc := usecase.NewInterviewRoundService(store, store, store, store, store, clock)
 	fitAssessmentSvc := usecase.NewFitAssessmentService(store, store, store, store, store, store, assistant, clock)
 	artifactSvc := usecase.NewApplicationArtifactService(store, store, store, store, store, store, store, assistant, blobStore, clock)
+	offerSvc := usecase.NewOfferService(store, store, store, store, clock)
+	analyticsSvc := usecase.NewAnalyticsService(store, store, clock)
+	backupSvc := usecase.NewBackupService(store)
+	seedSvc := usecase.NewSeedService(store, store, store, store, store, store, store, store, store, store, store, clock)
 
 	return httpadapter.NewRouter(
 		httpadapter.NewCompanyHandler(companySvc),
@@ -64,5 +68,9 @@ func NewHTTPHandler(store *sqlite.Store, deps Dependencies) http.Handler {
 		httpadapter.NewInterviewRoundHandler(interviewRoundSvc),
 		httpadapter.NewFitAssessmentHandler(fitAssessmentSvc),
 		httpadapter.NewApplicationArtifactHandler(artifactSvc),
+		httpadapter.NewOfferHandler(offerSvc),
+		httpadapter.NewAnalyticsHandler(analyticsSvc),
+		httpadapter.NewBackupHandler(backupSvc),
+		httpadapter.NewSeedHandler(seedSvc),
 	)
 }
