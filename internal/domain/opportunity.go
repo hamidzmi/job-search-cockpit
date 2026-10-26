@@ -190,3 +190,12 @@ func (o *Opportunity) Transition(transitionID string, toStage Stage, toOutcome O
 
 	return tr, nil
 }
+
+func (o *Opportunity) RecordActivity(activityAt, now time.Time) {
+	actUTC := activityAt.UTC()
+	if actUTC.After(o.LastActivityAt) {
+		o.LastActivityAt = actUTC
+	}
+	o.UpdatedAt = now.UTC()
+}
+

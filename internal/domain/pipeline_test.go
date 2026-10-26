@@ -400,6 +400,383 @@ func TestOpportunity_UpdateDetailsPreservesLastActivityAt(t *testing.T) {
 	}
 }
 
+func TestContact_LifecycleAndFilter(t *testing.T) {
+	now := time.Date(2026, 10, 26, 10, 0, 0, 0, time.UTC)
+	later := now.Add(2 * time.Hour)
+
+	tests := []struct {
+		name       string
+		id         string
+		input      domain.ContactInput
+		wantName   string
+		wantWarmth domain.ContactWarmth
+		wantErr    error
+	}{
+		{
+			name:    "rejects blank contact id",
+			id:      "  ",
+			input:   domain.ContactInput{Name: "Alice Chen"},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name:    "rejects blank contact name",
+			id:      "cnt-1",
+			input:   domain.ContactInput{Name: "   "},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects invalid warmth level",
+			id:   "cnt-1",
+			input: domain.ContactInput{
+				Name:   "Alice Chen",
+				Warmth: domain.ContactWarmth("SuperHot"),
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "defaults warmth to Warm and trims fields",
+			id:   " cnt-1 ",
+			input: domain.ContactInput{
+				CompanyID:   " comp-1 ",
+				Name:        "  Alice Chen  ",
+				Title:       "  Staff Engineer ",
+				Email:       " alice@example.com ",
+				LinkedInURL: " https://linkedin.com/in/alice ",
+				Notes:       " Met at GopherCon ",
+			},
+			wantName:   "Alice Chen",
+			wantWarmth: domain.ContactWarmthWarm,
+		},
+		{
+			name: "preserves explicit Advocate warmth",
+			id:   "cnt-2",
+			input: domain.ContactInput{
+				Name:   "Bob Martinez",
+				Warmth: domain.ContactWarmthAdvocate,
+			},
+			wantName:   "Bob Martinez",
+			wantWarmth: domain.ContactWarmthAdvocate,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := domain.NewContact(tc.id, tc.input, now)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Name != tc.wantName || got.Warmth != tc.wantWarmth {
+				t.Errorf("expected Name=%q Warmth=%q, got %q / %q", tc.wantName, tc.wantWarmth, got.Name, got.Warmth)
+			}
+			if !got.CreatedAt.Equal(now) || !got.UpdatedAt.Equal(now) {
+				t.Errorf("expected timestamps=%v, got %v / %v", now, got.CreatedAt, got.UpdatedAt)
+			}
+		})
+	}
+
+	t.Run("updates contact fields and validates filter", func(t *testing.T) {
+		cnt, err := domain.NewContact("cnt-1", domain.ContactInput{
+			Name:   "Alice Chen",
+			Warmth: domain.ContactWarmthCold,
+		}, now)
+		if err != nil {
+			t.Fatalf("setup failed: %v", err)
+		}
+		if err := cnt.Update(domain.ContactInput{
+			CompanyID: "comp-2",
+			Name:      "Alice C. Chen",
+			Title:     "Principal Engineer",
+			Warmth:    domain.ContactWarmthAdvocate,
+		}, later); err != nil {
+			t.Fatalf("update failed: %v", err)
+		}
+		if cnt.Name != "Alice C. Chen" || cnt.Warmth != domain.ContactWarmthAdvocate || !cnt.UpdatedAt.Equal(later) {
+			t.Errorf("unexpected updated contact: %+v", cnt)
+		}
+
+		if err := (domain.ContactFilter{Warmth: domain.ContactWarmthWarm}).Validate(); err != nil {
+			t.Errorf("expected valid filter, got %v", err)
+		}
+		if err := (domain.ContactFilter{Warmth: domain.ContactWarmth("Invalid")}).Validate(); !errors.Is(err, domain.ErrValidation) {
+			t.Errorf("expected ErrValidation on invalid warmth filter, got %v", err)
+		}
+	})
+}
+
+func TestOpportunityContact_Validation(t *testing.T) {
+	now := time.Date(2026, 10, 26, 11, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name    string
+		input   domain.OpportunityContactInput
+		wantErr error
+	}{
+		{
+			name: "validates canonical Referrer role",
+			input: domain.OpportunityContactInput{
+				OpportunityID: "opp-1",
+				ContactID:     "cnt-1",
+				Role:          domain.StakeholderRoleReferrer,
+				Notes:         "Submitted internal referral",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "validates Hiring Manager and Champion roles",
+			input: domain.OpportunityContactInput{
+				OpportunityID: "opp-1",
+				ContactID:     "cnt-2",
+				Role:          domain.StakeholderRoleHiringManager,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "rejects missing opportunity id",
+			input: domain.OpportunityContactInput{
+				ContactID: "cnt-1",
+				Role:      domain.StakeholderRoleRecruiter,
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects missing contact id",
+			input: domain.OpportunityContactInput{
+				OpportunityID: "opp-1",
+				Role:          domain.StakeholderRoleRecruiter,
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects non-canonical stakeholder role",
+			input: domain.OpportunityContactInput{
+				OpportunityID: "opp-1",
+				ContactID:     "cnt-1",
+				Role:          domain.StakeholderRole("CEO"),
+			},
+			wantErr: domain.ErrValidation,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			link, err := domain.NewOpportunityContact(tc.input, now)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if link.Role != tc.input.Role || !link.LinkedAt.Equal(now) {
+				t.Errorf("unexpected link: %+v", link)
+			}
+		})
+	}
+}
+
+func TestInteraction_AndOpportunityActivityAdvancement(t *testing.T) {
+	createdAt := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	occurredAt := time.Date(2026, 10, 24, 14, 0, 0, 0, time.UTC)
+	loggedAt := time.Date(2026, 10, 25, 10, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name           string
+		id             string
+		input          domain.InteractionInput
+		wantKind       domain.InteractionKind
+		wantDirection  domain.InteractionDirection
+		wantOccurredAt time.Time
+		wantErr        error
+	}{
+		{
+			name: "creates referral request interaction with explicit OccurredAt",
+			id:   "int-1",
+			input: domain.InteractionInput{
+				ContactID:     "cnt-1",
+				OpportunityID: "opp-1",
+				Kind:          domain.InteractionKindReferralRequest,
+				Direction:     domain.InteractionDirectionOutbound,
+				OccurredAt:    occurredAt,
+				Summary:       "  Sent resume and job link asking for internal referral  ",
+			},
+			wantKind:       domain.InteractionKindReferralRequest,
+			wantDirection:  domain.InteractionDirectionOutbound,
+			wantOccurredAt: occurredAt,
+		},
+		{
+			name: "defaults OccurredAt to now and Direction to Outbound when omitted",
+			id:   "int-2",
+			input: domain.InteractionInput{
+				ContactID: "cnt-1",
+				Kind:      domain.InteractionKindCoffeeChat,
+				Summary:   "30-minute virtual coffee chat",
+			},
+			wantKind:       domain.InteractionKindCoffeeChat,
+			wantDirection:  domain.InteractionDirectionOutbound,
+			wantOccurredAt: loggedAt,
+		},
+		{
+			name: "rejects blank contact id",
+			id:   "int-3",
+			input: domain.InteractionInput{
+				Kind:    domain.InteractionKindEmail,
+				Summary: "Hello",
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects blank summary",
+			id:   "int-4",
+			input: domain.InteractionInput{
+				ContactID: "cnt-1",
+				Kind:      domain.InteractionKindDM,
+				Summary:   "   ",
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects invalid interaction kind",
+			id:   "int-5",
+			input: domain.InteractionInput{
+				ContactID: "cnt-1",
+				Kind:      domain.InteractionKind("CarrierPigeon"),
+				Summary:   "Coo",
+			},
+			wantErr: domain.ErrValidation,
+		},
+		{
+			name: "rejects invalid interaction direction",
+			id:   "int-6",
+			input: domain.InteractionInput{
+				ContactID: "cnt-1",
+				Kind:      domain.InteractionKindPhoneCall,
+				Direction: domain.InteractionDirection("Sideways"),
+				Summary:   "Call",
+			},
+			wantErr: domain.ErrValidation,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := domain.NewInteraction(tc.id, tc.input, loggedAt)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Kind != tc.wantKind || got.Direction != tc.wantDirection || !got.OccurredAt.Equal(tc.wantOccurredAt) {
+				t.Errorf("unexpected interaction: %+v", got)
+			}
+		})
+	}
+
+	t.Run("Opportunity.RecordActivity advances LastActivityAt and UpdatedAt without moving LastActivityAt backwards", func(t *testing.T) {
+		opp, _, err := domain.NewOpportunity("opp-1", "tr-1", domain.OpportunityInput{
+			OpportunityDetailsInput: domain.OpportunityDetailsInput{
+				CompanyID: "comp-1",
+				RoleTitle: "Staff Engineer",
+			},
+		}, createdAt)
+		if err != nil {
+			t.Fatalf("setup failed: %v", err)
+		}
+
+		opp.RecordActivity(occurredAt, loggedAt)
+		if !opp.LastActivityAt.Equal(occurredAt) || !opp.UpdatedAt.Equal(loggedAt) {
+			t.Errorf("expected LastActivityAt=%v UpdatedAt=%v, got %v / %v", occurredAt, loggedAt, opp.LastActivityAt, opp.UpdatedAt)
+		}
+
+		// Logging a backdated interaction older than current LastActivityAt preserves the newer LastActivityAt
+		olderOccurredAt := createdAt.Add(1 * time.Hour)
+		laterLoggedAt := loggedAt.Add(1 * time.Hour)
+		opp.RecordActivity(olderOccurredAt, laterLoggedAt)
+		if !opp.LastActivityAt.Equal(occurredAt) {
+			t.Errorf("expected LastActivityAt to remain %v on backdated interaction, got %v", occurredAt, opp.LastActivityAt)
+		}
+		if !opp.UpdatedAt.Equal(laterLoggedAt) {
+			t.Errorf("expected UpdatedAt=%v, got %v", laterLoggedAt, opp.UpdatedAt)
+		}
+	})
+}
+
+func TestActionItem_Lifecycle(t *testing.T) {
+	now := time.Date(2026, 10, 25, 10, 0, 0, 0, time.UTC)
+	dueAt := time.Date(2026, 10, 29, 17, 0, 0, 0, time.UTC)
+	later := now.Add(4 * time.Hour)
+
+	t.Run("rejects missing title or zero due date", func(t *testing.T) {
+		if _, err := domain.NewActionItem("ai-1", domain.ActionItemInput{
+			Title: "   ",
+			DueAt: dueAt,
+		}, now); !errors.Is(err, domain.ErrValidation) {
+			t.Errorf("expected ErrValidation for blank title, got %v", err)
+		}
+		if _, err := domain.NewActionItem("ai-1", domain.ActionItemInput{
+			Title: "Follow up with Alice",
+		}, now); !errors.Is(err, domain.ErrValidation) {
+			t.Errorf("expected ErrValidation for zero due date, got %v", err)
+		}
+	})
+
+	t.Run("creates open action item, edits details, completes, and dismisses", func(t *testing.T) {
+		item, err := domain.NewActionItem("ai-1", domain.ActionItemInput{
+			Title:         "  Follow up with Alice on Stripe referral  ",
+			OpportunityID: " opp-1 ",
+			ContactID:     " cnt-1 ",
+			DueAt:         dueAt,
+			Notes:         " Send updated resume ",
+		}, now)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if item.Status != domain.ActionItemStatusOpen || item.Title != "Follow up with Alice on Stripe referral" {
+			t.Fatalf("unexpected initial ActionItem: %+v", item)
+		}
+
+		nextDue := dueAt.Add(48 * time.Hour)
+		if err := item.Update(domain.ActionItemUpdateInput{
+			Title:         "Follow up with Alice on Stripe Staff role",
+			OpportunityID: "opp-1",
+			ContactID:     "cnt-1",
+			DueAt:         nextDue,
+			Status:        domain.ActionItemStatusCompleted,
+			Notes:         "Sent thank-you note",
+		}, later); err != nil {
+			t.Fatalf("update failed: %v", err)
+		}
+		if item.Status != domain.ActionItemStatusCompleted || !item.DueAt.Equal(nextDue) || !item.UpdatedAt.Equal(later) {
+			t.Errorf("unexpected updated ActionItem: %+v", item)
+		}
+
+		dismissedAt := later.Add(time.Hour)
+		if err := item.Update(domain.ActionItemUpdateInput{
+			Title:  item.Title,
+			DueAt:  item.DueAt,
+			Status: domain.ActionItemStatusDismissed,
+		}, dismissedAt); err != nil {
+			t.Fatalf("dismiss failed: %v", err)
+		}
+		if item.Status != domain.ActionItemStatusDismissed {
+			t.Errorf("expected status dismissed, got %s", item.Status)
+		}
+	})
+}
+
+
+
 func TestOpportunityFilter_Validate(t *testing.T) {
 	tests := []struct {
 		name    string

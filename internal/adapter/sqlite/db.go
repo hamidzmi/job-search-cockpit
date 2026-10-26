@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -36,27 +38,26 @@ func OpenAndMigrate(dbPath string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	entries, err := migrationsFS.ReadDir("migrations")
+	entries, err := fs.ReadDir(migrationsFS, "migrations")
 	if err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("read migrations directory: %w", err)
+		return nil, fmt.Errorf("read migrations: %w", err)
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Name() < entries[j].Name()
 	})
-
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
 			continue
 		}
-		sqlBytes, readErr := migrationsFS.ReadFile(filepath.Join("migrations", entry.Name()))
-		if readErr != nil {
+		sqlBytes, err := migrationsFS.ReadFile(filepath.Join("migrations", entry.Name()))
+		if err != nil {
 			_ = db.Close()
-			return nil, fmt.Errorf("read migration %s: %w", entry.Name(), readErr)
+			return nil, fmt.Errorf("read migration %s: %w", entry.Name(), err)
 		}
-		if _, execErr := db.Exec(string(sqlBytes)); execErr != nil {
+		if _, err := db.Exec(string(sqlBytes)); err != nil {
 			_ = db.Close()
-			return nil, fmt.Errorf("apply migration %s: %w", entry.Name(), execErr)
+			return nil, fmt.Errorf("apply migration %s: %w", entry.Name(), err)
 		}
 	}
 

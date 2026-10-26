@@ -214,3 +214,244 @@ export interface QuickCaptureSaveInput {
   notes: string;
   job_posting: JobPostingInput;
 }
+
+export interface WorkHistoryEntry {
+  company: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  summary: string;
+  impact_bullets: string[];
+}
+
+export interface CandidateProfile {
+  full_name: string;
+  headline: string;
+  summary: string;
+  work_history: WorkHistoryEntry[];
+  skills: string[];
+  target_role_titles: string[];
+  location_preferences: string[];
+  remote_preference: string;
+  compensation_floor: number;
+  target_compensation: number;
+  currency: string;
+  updated_at: string;
+}
+
+export interface CandidateProfileUpsertInput {
+  full_name: string;
+  headline: string;
+  summary: string;
+  work_history: WorkHistoryEntry[];
+  skills: string[];
+  target_role_titles: string[];
+  location_preferences: string[];
+  remote_preference: string;
+  compensation_floor: number;
+  target_compensation: number;
+  currency: string;
+}
+
+export interface Story {
+  id: string;
+  title: string;
+  hook: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  competency_tags: string[];
+  skill_tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoryUpsertInput {
+  title: string;
+  hook: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  competency_tags: string[];
+  skill_tags: string[];
+}
+
+export interface StoryFilter {
+  q?: string;
+  competency_tag?: string;
+  skill_tag?: string;
+}
+
+export const CONTACT_WARMTHS = ['Cold', 'Warm', 'Advocate'] as const;
+export type ContactWarmth = (typeof CONTACT_WARMTHS)[number];
+
+export const STAKEHOLDER_ROLES = [
+  'Referrer',
+  'Recruiter',
+  'Hiring Manager',
+  'Interviewer',
+  'Champion',
+  'Other',
+] as const;
+export type StakeholderRole = (typeof STAKEHOLDER_ROLES)[number];
+
+export const INTERACTION_KINDS = [
+  'Email',
+  'DM',
+  'Referral Request',
+  'Coffee Chat',
+  'Phone Call',
+  'Other',
+] as const;
+export type InteractionKind = (typeof INTERACTION_KINDS)[number];
+
+export const INTERACTION_DIRECTIONS = ['Outbound', 'Inbound'] as const;
+export type InteractionDirection = (typeof INTERACTION_DIRECTIONS)[number];
+
+export const ACTION_ITEM_STATUSES = ['open', 'completed', 'dismissed'] as const;
+export type ActionItemStatus = (typeof ACTION_ITEM_STATUSES)[number];
+
+export interface ContactOpportunityLink {
+  opportunity_id: string;
+  company_id: string;
+  company_name: string;
+  role_title: string;
+  stage: Stage;
+  outcome: Outcome;
+  role: StakeholderRole;
+  notes: string;
+  linked_at: string;
+}
+
+export interface Contact {
+  id: string;
+  company_id: string;
+  company_name: string;
+  name: string;
+  title: string;
+  email: string;
+  linkedin_url: string;
+  warmth: ContactWarmth;
+  notes: string;
+  linked_opportunities: ContactOpportunityLink[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactUpsertInput {
+  company_id: string;
+  name: string;
+  title: string;
+  email: string;
+  linkedin_url: string;
+  warmth: ContactWarmth;
+  notes: string;
+}
+
+export interface ContactFilter {
+  company_id?: string;
+  warmth?: ContactWarmth | '';
+  q?: string;
+}
+
+export interface OpportunityContact {
+  opportunity_id: string;
+  contact_id: string;
+  role: StakeholderRole;
+  notes: string;
+  linked_at: string;
+  company_id: string;
+  company_name: string;
+  name: string;
+  title: string;
+  email: string;
+  linkedin_url: string;
+  warmth: ContactWarmth;
+  contact_notes: string;
+}
+
+export interface OpportunityContactLinkInput {
+  contact_id: string;
+  role: StakeholderRole;
+  notes?: string;
+}
+
+export interface Interaction {
+  id: string;
+  contact_id: string;
+  contact_name: string;
+  opportunity_id: string;
+  opportunity_role_title: string;
+  company_name: string;
+  kind: InteractionKind;
+  direction: InteractionDirection;
+  occurred_at: string;
+  summary: string;
+  created_at: string;
+}
+
+export interface FollowUpActionItemInput {
+  title: string;
+  due_at: string;
+  notes?: string;
+}
+
+export interface InteractionCreateInput {
+  contact_id: string;
+  opportunity_id?: string;
+  kind: InteractionKind;
+  direction: InteractionDirection;
+  occurred_at?: string;
+  summary: string;
+  follow_up?: FollowUpActionItemInput;
+}
+
+export interface InteractionFilter {
+  contact_id?: string;
+  opportunity_id?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  title: string;
+  opportunity_id: string;
+  opportunity_role_title: string;
+  contact_id: string;
+  contact_name: string;
+  company_name: string;
+  due_at: string;
+  status: ActionItemStatus;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActionItemCreateInput {
+  title: string;
+  opportunity_id?: string;
+  contact_id?: string;
+  due_at: string;
+  notes?: string;
+}
+
+export interface ActionItemUpdateInput {
+  title: string;
+  opportunity_id?: string;
+  contact_id?: string;
+  due_at: string;
+  status: ActionItemStatus;
+  notes?: string;
+}
+
+export interface ActionItemFilter {
+  status?: ActionItemStatus | '';
+  opportunity_id?: string;
+  contact_id?: string;
+}
+
+export interface LogInteractionResponse {
+  interaction: Interaction;
+  follow_up_action_item?: ActionItem;
+}
