@@ -289,7 +289,7 @@ function renderOpportunityWorkspace() {
   return render(
     <QueryClientProvider client={queryClient}>
       <CockpitApiProvider>
-        <MemoryRouter initialEntries={['/opportunities/opp-1']}>
+        <MemoryRouter initialEntries={['/opportunities/opp-1?tab=fit']}>
           <AppRoutes />
         </MemoryRouter>
       </CockpitApiProvider>

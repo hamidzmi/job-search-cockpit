@@ -285,7 +285,7 @@ describe('Analytics, Offers & Backup/Seeding Workspace Views', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <CockpitApiProvider api={mockApi}>
-          <MemoryRouter initialEntries={['/opportunities/opp-1']}>
+          <MemoryRouter initialEntries={['/opportunities/opp-1?tab=offer']}>
             <AppRoutes />
           </MemoryRouter>
         </CockpitApiProvider>

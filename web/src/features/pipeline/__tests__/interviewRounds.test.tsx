@@ -389,7 +389,7 @@ function installInterviewAndQuestionBankHandlers() {
   return { fetchMock, rounds };
 }
 
-function renderCockpit(initialEntries = ['/opportunities/opp-1']) {
+function renderCockpit(initialEntries = ['/opportunities/opp-1?tab=interviews']) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -415,7 +415,7 @@ describe('Interview Rounds, Loop Story De-duplication & Debrief Question Bank', 
     const user = userEvent.setup();
     installInterviewAndQuestionBankHandlers();
 
-    renderCockpit(['/opportunities/opp-1']);
+    renderCockpit(['/opportunities/opp-1?tab=interviews']);
 
     expect(
       await screen.findByRole('heading', { name: 'Staff Core Payments Engineer' }),
