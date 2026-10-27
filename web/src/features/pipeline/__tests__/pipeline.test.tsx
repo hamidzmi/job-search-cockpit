@@ -994,6 +994,8 @@ describe('Pipeline Spine Workspace Views (over /api/* HTTP handlers)', () => {
 
     const initialLastActivity = screen.getByTestId('detail-last-activity').textContent;
 
+    await user.click(screen.getByRole('tab', { name: /Contacts/i }));
+
     const contactsSection = screen.getByRole('region', {
       name: 'Opportunity Contacts and Interactions',
     });

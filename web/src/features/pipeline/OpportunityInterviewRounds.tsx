@@ -71,7 +71,6 @@ export function OpportunityInterviewRounds({
   const numericRoundOrder = Number(roundOrder) || 1;
 
   // Compute live prior-round usage for the currently selected roundOrder in the form
-  // (ignoring Cancelled rounds and the round currently being edited)
   const priorUsageByStoryId = useMemo(() => {
     const map: Record<string, StoryPriorRoundRef[]> = {};
     const sorted = [...rounds]
@@ -113,12 +112,13 @@ export function OpportunityInterviewRounds({
   };
 
   const saveRoundMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: () => {
       const payload = {
-        round_order: numericRoundOrder,
+        opportunity_id: opportunityId,
+        round_order: Number(roundOrder) || 1,
         round_type: roundType,
         title: title.trim() || roundType,
-        scheduled_at: scheduledAt,
+        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : '',
         duration_minutes: durationMinutes,
         status,
         prep_notes: prepNotes,
@@ -134,32 +134,37 @@ export function OpportunityInterviewRounds({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['interview-rounds', opportunityId] }),
         queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] }),
-        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
+        queryClient.invalidateQueries({ queryKey: ['flight-deck'] }),
       ]);
-      const nextOrder =
-        rounds.reduce((max, r) => Math.max(max, r.round_order), numericRoundOrder) + 1;
-      resetRoundForm(nextOrder);
+      resetRoundForm(rounds.length + (editingRound ? 1 : 2));
     },
   });
 
   const deleteRoundMutation = useMutation({
     mutationFn: (roundId: string) => api.interviewRounds.deleteInterviewRound(roundId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['interview-rounds', opportunityId],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['interview-rounds', opportunityId] }),
+        queryClient.invalidateQueries({ queryKey: ['flight-deck'] }),
+      ]);
     },
   });
 
   const saveDebriefMutation = useMutation({
-    mutationFn: (input: { roundId: string; payload: DebriefUpsertInput }) =>
-      api.interviewRounds.recordDebrief(input.roundId, input.payload),
+    mutationFn: ({
+      roundId,
+      payload,
+    }: {
+      roundId: string;
+      payload: DebriefUpsertInput;
+    }) => api.interviewRounds.recordDebrief(roundId, payload),
     onSuccess: async () => {
-      setDebriefRound(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['interview-rounds', opportunityId] }),
+        queryClient.invalidateQueries({ queryKey: ['flight-deck'] }),
         queryClient.invalidateQueries({ queryKey: ['question-bank'] }),
       ]);
+      setDebriefRound(null);
     },
   });
 
@@ -191,17 +196,13 @@ export function OpportunityInterviewRounds({
 
   const toggleContact = (contactId: string) => {
     setSelectedContactIds((prev) =>
-      prev.includes(contactId)
-        ? prev.filter((id) => id !== contactId)
-        : [...prev, contactId],
+      prev.includes(contactId) ? prev.filter((id) => id !== contactId) : [...prev, contactId],
     );
   };
 
   const toggleStory = (storyId: string) => {
     setSelectedStoryIds((prev) =>
-      prev.includes(storyId)
-        ? prev.filter((id) => id !== storyId)
-        : [...prev, storyId],
+      prev.includes(storyId) ? prev.filter((id) => id !== storyId) : [...prev, storyId],
     );
   };
 
@@ -209,89 +210,131 @@ export function OpportunityInterviewRounds({
     <section
       className="panel-card panel-card-full"
       aria-label="Opportunity Interview Rounds and Debriefs"
+      style={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none' }}
     >
-      <h3>Interview Rounds &amp; Debriefs ({rounds.length})</h3>
-      <p className="panel-hint">
-        Order company-specific Interview Rounds, attach interviewer Contacts and STAR Stories (with automatic same-loop repeat warnings), and capture post-interview Debriefs.
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>
+            Interview Loop ({rounds.length} {rounds.length === 1 ? 'Round' : 'Rounds'})
+          </h3>
+          <p className="panel-hint" style={{ margin: '0.25rem 0 0' }}>
+            Structured loop stages, linked STAR stories, same-loop repeat prevention, and post-round debriefs.
+          </p>
+        </div>
+      </div>
 
       {rounds.length === 0 ? (
-        <p className="timestamp-text">No Interview Rounds scheduled for this Opportunity yet.</p>
+        <div className="panel-card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            No Interview Rounds scheduled for this Opportunity yet. Use the form below to add your first round.
+          </p>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {rounds.map((r) => (
-            <article key={r.id} className="panel-card">
-              <div className="card-top-row">
-                <div>
-                  <h4>
-                    Round {r.round_order}: {r.title}
-                  </h4>
-                  <div className="card-meta">
-                    <span className="stage-badge">{r.round_type}</span>
-                    <span className="outcome-pill">{r.status}</span>
-                    {r.scheduled_at && (
-                      <span>Scheduled: {formatLocalDateTime(r.scheduled_at)}</span>
-                    )}
-                    {r.duration_minutes > 0 && <span>{r.duration_minutes} mins</span>}
+        <div className="interview-loop-timeline">
+          {rounds.map((r) => {
+            const isCompleted = r.status === 'Completed';
+            const isCancelled = r.status === 'Cancelled';
+            const cardClass = isCompleted
+              ? 'round-card-completed'
+              : isCancelled
+              ? 'round-card-cancelled'
+              : 'round-card-scheduled';
+
+            return (
+              <article key={r.id} className={`round-card-modern ${cardClass}`}>
+                <div className="card-top-row">
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+                      Round {r.round_order}: {r.title}
+                    </h4>
+                    <div className="card-meta" style={{ marginTop: '0.35rem' }}>
+                      <span className="stage-badge">{r.round_type}</span>
+                      <span className="outcome-pill">{r.status}</span>
+                      {r.scheduled_at && (
+                        <span>🕒 {formatLocalDateTime(r.scheduled_at)}</span>
+                      )}
+                      {r.duration_minutes > 0 && <span>({r.duration_minutes} mins)</span>}
+                    </div>
+                  </div>
+                  <div className="workspace-actions">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => openDebriefModal(r)}
+                    >
+                      {r.debrief ? 'Edit Debrief' : 'Record / Edit Debrief'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        setEditingRound(r);
+                        setRoundOrder(String(r.round_order));
+                        setRoundType(r.round_type);
+                        setTitle(r.title);
+                        setScheduledAt(r.scheduled_at ? r.scheduled_at.slice(0, 16) : '');
+                        setDurationMinutes(r.duration_minutes);
+                        setStatus(r.status);
+                        setPrepNotes(r.prep_notes);
+                        setSelectedContactIds(r.contact_ids);
+                        setSelectedStoryIds(r.story_ids);
+                      }}
+                    >
+                      Edit Round
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => deleteRoundMutation.mutate(r.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
-                <div className="workspace-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => openDebriefModal(r)}
-                  >
-                    Record / Edit Debrief
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => {
-                      setEditingRound(r);
-                      setRoundOrder(String(r.round_order));
-                      setRoundType(r.round_type);
-                      setTitle(r.title);
-                      setScheduledAt(r.scheduled_at ? r.scheduled_at.slice(0, 16) : '');
-                      setDurationMinutes(r.duration_minutes);
-                      setStatus(r.status);
-                      setPrepNotes(r.prep_notes);
-                      setSelectedContactIds(r.contact_ids);
-                      setSelectedStoryIds(r.story_ids);
-                    }}
-                  >
-                    Edit Round
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => deleteRoundMutation.mutate(r.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
 
-              {r.prep_notes && <p className="timeline-note">Prep: {r.prep_notes}</p>}
+                {r.prep_notes && (
+                  <div className="round-prep-box">
+                    <strong>Preparation Notes:</strong> {r.prep_notes}
+                  </div>
+                )}
 
-              {r.contacts.length > 0 && (
-                <div>
-                  <strong style={{ fontSize: '0.82rem' }}>Interviewer Contacts:</strong>{' '}
-                  {r.contacts.map((c) => `${c.name}${c.title ? ` (${c.title})` : ''}`).join(', ')}
-                </div>
-              )}
+                {r.contacts.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.84rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Interviewers:</span>
+                    {r.contacts.map((c) => (
+                      <span key={c.contact_id} className="company-pill">
+                        {c.name} {c.title ? `(${c.title})` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-              {r.stories.length > 0 && (
-                <div>
-                  <strong style={{ fontSize: '0.82rem' }}>Planned / Used Stories:</strong>
-                  <ul className="timeline-list" style={{ marginTop: '0.35rem' }}>
-                    {r.stories.map((st) => (
-                      <li key={st.story_id} className="timeline-item">
-                        <div className="timeline-header">
+                {r.stories.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                      Planned Stories:
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {r.stories.map((st) => (
+                        <div
+                          key={st.story_id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '0.45rem',
+                            padding: '0.25rem 0.55rem',
+                            fontSize: '0.82rem',
+                          }}
+                        >
                           <span>{st.title}</span>
                           {st.used_in_earlier_rounds.length > 0 && (
                             <span
-                              className="outcome-badge outcome-on-hold"
+                              className="priority-badge priority-medium"
                               role="status"
+                              style={{ fontSize: '0.72rem' }}
                             >
                               Repeated Story: Used in{' '}
                               {st.used_in_earlier_rounds
@@ -300,245 +343,79 @@ export function OpportunityInterviewRounds({
                             </span>
                           )}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {r.debrief && (
-                <div
-                  style={{
-                    borderTop: '1px solid #e2e8f0',
-                    paddingTop: '0.65rem',
-                    marginTop: '0.35rem',
-                  }}
-                >
-                  <div className="timeline-header">
-                    <strong>Post-Interview Debrief</strong>
-                    <span className="stage-badge">
-                      Confidence: {r.debrief.confidence_score} / 5
-                    </span>
-                  </div>
-                  {r.debrief.went_well && (
-                    <p className="timeline-note">
-                      <strong>Went Well:</strong> {r.debrief.went_well}
-                    </p>
-                  )}
-                  {r.debrief.to_improve && (
-                    <p className="timeline-note">
-                      <strong>To Improve:</strong> {r.debrief.to_improve}
-                    </p>
-                  )}
-                  {r.debrief.signals && (
-                    <p className="timeline-note">
-                      <strong>Signals:</strong> {r.debrief.signals}
-                    </p>
-                  )}
-                  {r.debrief.follow_up_notes && (
-                    <p className="timeline-note">
-                      <strong>Follow-up:</strong> {r.debrief.follow_up_notes}
-                    </p>
-                  )}
-                  {r.debrief.questions_asked.length > 0 && (
-                    <div style={{ marginTop: '0.4rem' }}>
-                      <strong style={{ fontSize: '0.8rem' }}>
-                        Questions Asked ({r.debrief.questions_asked.length}):
-                      </strong>
-                      <ul className="timeline-list">
-                        {r.debrief.questions_asked.map((q, idx) => (
-                          <li key={idx} className="timeline-item">
-                            <div>
-                              <strong>{q.question}</strong>{' '}
-                              {q.category && (
-                                <span className="tech-tag">{q.category}</span>
-                              )}
-                              {q.answered_with_story_title && (
-                                <span className="stage-badge">
-                                  Answered with: {q.answered_with_story_title}
-                                </span>
-                              )}
-                            </div>
-                            {q.notes && <p className="timeline-note">{q.notes}</p>}
-                          </li>
-                        ))}
-                      </ul>
+                      ))}
                     </div>
-                  )}
-                </div>
-              )}
-            </article>
-          ))}
+                  </div>
+                )}
+
+                {r.debrief && (
+                  <div className="debrief-summary-box">
+                    <div className="timeline-header">
+                      <strong style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>✓</span> Debrief Completed
+                      </strong>
+                      <span className="priority-badge" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
+                        Confidence: {r.debrief.confidence_score} / 5
+                      </span>
+                    </div>
+                    {r.debrief.went_well && (
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                        <strong>Went Well:</strong> {r.debrief.went_well}
+                      </p>
+                    )}
+                    {r.debrief.to_improve && (
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                        <strong>To Improve:</strong> {r.debrief.to_improve}
+                      </p>
+                    )}
+                    {r.debrief.signals && (
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                        <strong>Signals:</strong> {r.debrief.signals}
+                      </p>
+                    )}
+                    {r.debrief.follow_up_notes && (
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                        <strong>Follow-up:</strong> {r.debrief.follow_up_notes}
+                      </p>
+                    )}
+                    {r.debrief.questions_asked.length > 0 && (
+                      <div style={{ marginTop: '0.35rem', borderTop: '1px solid #bbf7d0', paddingTop: '0.35rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534' }}>
+                          Questions Recorded ({r.debrief.questions_asked.length}):
+                        </span>
+                        <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.82rem', color: '#14532d' }}>
+                          {r.debrief.questions_asked.map((q, idx) => (
+                            <li key={idx}>
+                              <strong>{q.question}</strong> {q.category && `[${q.category}]`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
 
-      <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', width: '100%' }} />
-
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          await saveRoundMutation.mutateAsync();
+      {/* Schedule / Add / Edit Round Section */}
+      <div
+        className="panel-card"
+        style={{
+          marginTop: '1.75rem',
+          background: '#ffffff',
+          borderRadius: '0.75rem',
+          border: '1px solid var(--border-subtle)',
         }}
-        className="form-grid"
       >
-        <h4 className="form-field-full" style={{ margin: 0 }}>
-          {editingRound
-            ? `Edit Round ${editingRound.round_order}: ${editingRound.title}`
-            : 'Schedule / Add Interview Round'}
-        </h4>
-
-        <label className="form-field">
-          <span>Round Order *</span>
-          <input
-            type="number"
-            aria-label="Interview Round Order"
-            min={1}
-            required
-            value={roundOrder}
-            onChange={(e) => setRoundOrder(e.target.value)}
-          />
-        </label>
-
-        <label className="form-field">
-          <span>Round Type *</span>
-          <select
-            aria-label="Interview Round Type"
-            value={roundType}
-            onChange={(e) => {
-              const nextType = e.target.value;
-              setRoundType(nextType);
-              if (!title.trim() || INTERVIEW_ROUND_TYPES.includes(title as never)) {
-                setTitle(nextType);
-              }
-            }}
-          >
-            {INTERVIEW_ROUND_TYPES.map((rt) => (
-              <option key={rt} value={rt}>
-                {rt}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="form-field">
-          <span>Custom Title / Label *</span>
-          <input
-            type="text"
-            aria-label="Interview Round Title"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-
-        <label className="form-field">
-          <span>Status</span>
-          <select
-            aria-label="Interview Round Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as InterviewRoundStatus)}
-          >
-            {INTERVIEW_ROUND_STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {st}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="form-field">
-          <span>Scheduled Date/Time</span>
-          <input
-            type="datetime-local"
-            aria-label="Interview Scheduled At"
-            value={scheduledAt}
-            onChange={(e) => setScheduledAt(e.target.value)}
-          />
-        </label>
-
-        <label className="form-field">
-          <span>Duration (Minutes)</span>
-          <input
-            type="number"
-            aria-label="Interview Duration Minutes"
-            min={0}
-            value={durationMinutes}
-            onChange={(e) => setDurationMinutes(Number(e.target.value) || 0)}
-          />
-        </label>
-
-        <label className="form-field form-field-full">
-          <span>Preparation Notes</span>
-          <textarea
-            aria-label="Preparation Notes"
-            rows={2}
-            value={prepNotes}
-            onChange={(e) => setPrepNotes(e.target.value)}
-          />
-        </label>
-
-        <div className="form-field">
-          <span>Participating Interviewer Contacts</span>
-          {allContacts.length === 0 ? (
-            <p className="timestamp-text">No Contacts in directory yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              {allContacts.map((c) => (
-                <label key={c.id} style={{ fontSize: '0.84rem' }}>
-                  <input
-                    type="checkbox"
-                    aria-label={`Interviewer Contact: ${c.name}`}
-                    checked={selectedContactIds.includes(c.id)}
-                    onChange={() => toggleContact(c.id)}
-                  />{' '}
-                  {c.name} {c.title ? `(${c.title})` : ''}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="form-field">
-          <span>Planned / Used Stories (Story Bank)</span>
-          {allStories.length === 0 ? (
-            <p className="timestamp-text">No Stories in Story Bank yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {allStories.map((st) => {
-                const priors = priorUsageByStoryId[st.id] ?? [];
-                return (
-                  <div key={st.id} style={{ fontSize: '0.84rem' }}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        aria-label={`Planned Story: ${st.title}`}
-                        checked={selectedStoryIds.includes(st.id)}
-                        onChange={() => toggleStory(st.id)}
-                      />{' '}
-                      {st.title}
-                    </label>
-                    {priors.length > 0 && (
-                      <span
-                        className="outcome-badge outcome-on-hold"
-                        style={{ marginLeft: '0.5rem' }}
-                      >
-                        Already used in{' '}
-                        {priors
-                          .map((p) => `Round ${p.round_order} (${p.title})`)
-                          .join(', ')}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="form-field-full workspace-actions">
-          <button type="submit" className="btn-primary">
-            {editingRound ? 'Save Interview Round' : 'Add Interview Round'}
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
+            {editingRound
+              ? `Edit Round ${editingRound.round_order}: ${editingRound.title}`
+              : 'Schedule / Add Interview Round'}
+          </h4>
           {editingRound && (
             <button
               type="button"
@@ -549,7 +426,203 @@ export function OpportunityInterviewRounds({
             </button>
           )}
         </div>
-      </form>
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            await saveRoundMutation.mutateAsync();
+          }}
+          className="form-grid"
+        >
+          <label className="form-field">
+            <span>Round Order *</span>
+            <input
+              type="number"
+              aria-label="Interview Round Order"
+              min={1}
+              required
+              value={roundOrder}
+              onChange={(e) => setRoundOrder(e.target.value)}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Round Type *</span>
+            <select
+              aria-label="Interview Round Type"
+              value={roundType}
+              onChange={(e) => {
+                const nextType = e.target.value;
+                setRoundType(nextType);
+                if (!title.trim() || INTERVIEW_ROUND_TYPES.includes(title as never)) {
+                  setTitle(nextType);
+                }
+              }}
+            >
+              {INTERVIEW_ROUND_TYPES.map((rt) => (
+                <option key={rt} value={rt}>
+                  {rt}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Custom Title / Label *</span>
+            <input
+              type="text"
+              aria-label="Interview Round Title"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Status</span>
+            <select
+              aria-label="Interview Round Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as InterviewRoundStatus)}
+            >
+              {INTERVIEW_ROUND_STATUSES.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Scheduled Date/Time</span>
+            <input
+              type="datetime-local"
+              aria-label="Interview Scheduled At"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Duration (Minutes)</span>
+            <input
+              type="number"
+              aria-label="Interview Duration Minutes"
+              min={0}
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Number(e.target.value) || 0)}
+            />
+          </label>
+
+          <label className="form-field form-field-full">
+            <span>Preparation Notes</span>
+            <textarea
+              aria-label="Preparation Notes"
+              rows={2}
+              value={prepNotes}
+              onChange={(e) => setPrepNotes(e.target.value)}
+              placeholder="Key technical topics to cover, questions for interviewer, reminders..."
+            />
+          </label>
+
+          <div className="form-field">
+            <span>Participating Interviewer Contacts</span>
+            {allContacts.length === 0 ? (
+              <p className="timestamp-text">No Contacts in directory yet.</p>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.35rem',
+                  maxHeight: '140px',
+                  overflowY: 'auto',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.45rem',
+                  padding: '0.5rem',
+                  background: '#f8fafc',
+                }}
+              >
+                {allContacts.map((c) => (
+                  <label key={c.id} style={{ fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Interviewer Contact: ${c.name}`}
+                      checked={selectedContactIds.includes(c.id)}
+                      onChange={() => toggleContact(c.id)}
+                    />{' '}
+                    <span>{c.name} {c.title ? `(${c.title})` : ''}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="form-field">
+            <span>Planned / Used Stories (Story Bank)</span>
+            {allStories.length === 0 ? (
+              <p className="timestamp-text">No Stories in Story Bank yet.</p>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                  maxHeight: '140px',
+                  overflowY: 'auto',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.45rem',
+                  padding: '0.5rem',
+                  background: '#f8fafc',
+                }}
+              >
+                {allStories.map((st) => {
+                  const priors = priorUsageByStoryId[st.id] ?? [];
+                  return (
+                    <div key={st.id} style={{ fontSize: '0.84rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Planned Story: ${st.title}`}
+                          checked={selectedStoryIds.includes(st.id)}
+                          onChange={() => toggleStory(st.id)}
+                        />{' '}
+                        <span>{st.title}</span>
+                      </label>
+                      {priors.length > 0 && (
+                        <span
+                          className="priority-badge priority-medium"
+                          style={{ marginLeft: '1.4rem', marginTop: '0.15rem', display: 'inline-block' }}
+                        >
+                          Already used in{' '}
+                          {priors
+                            .map((p) => `Round ${p.round_order} (${p.title})`)
+                            .join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="form-field-full workspace-actions" style={{ marginTop: '0.5rem' }}>
+            <button type="submit" className="btn-primary">
+              {editingRound ? 'Save Interview Round' : 'Add Interview Round'}
+            </button>
+            {editingRound && (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => resetRoundForm(rounds.length + 1)}
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
 
       {debriefRound && (
         <div
@@ -566,7 +639,7 @@ export function OpportunityInterviewRounds({
                 className="btn-ghost"
                 onClick={() => setDebriefRound(null)}
               >
-                Close
+                ✕
               </button>
             </div>
 

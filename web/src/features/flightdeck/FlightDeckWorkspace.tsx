@@ -185,8 +185,51 @@ export function FlightDeckWorkspace() {
         </div>
       </header>
 
-      {/* 1. Imminent Interview Rounds (next 48 hours) pinned at top */}
-      <section className="flight-deck-section" data-testid="imminent-rounds-section">
+      {/* Cockpit HUD: High-signal daily metrics */}
+      <div className="flight-deck-hud">
+        <div className="hud-card">
+          <div>
+            <div className="hud-value">{action_items.length}</div>
+            <div className="hud-label">Action Items</div>
+          </div>
+          <div className="hud-icon-badge" style={{ background: '#fef3c7', color: '#b45309' }}>
+            ⚡
+          </div>
+        </div>
+        <div className="hud-card">
+          <div>
+            <div className="hud-value">{upcoming_rounds.length}</div>
+            <div className="hud-label">Upcoming Rounds</div>
+          </div>
+          <div className="hud-icon-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+            📅
+          </div>
+        </div>
+        <div className="hud-card">
+          <div>
+            <div className="hud-value">{missing_debriefs.length}</div>
+            <div className="hud-label">Debriefs Needed</div>
+          </div>
+          <div className="hud-icon-badge" style={{ background: '#fee2e2', color: '#be123c' }}>
+            ✍️
+          </div>
+        </div>
+        <div className="hud-card">
+          <div>
+            <div className="hud-value">{stale_opportunities.length}</div>
+            <div className="hud-label">Stale Alerts</div>
+          </div>
+          <div className="hud-icon-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+            ⚠️
+          </div>
+        </div>
+      </div>
+
+      <div className="flight-deck-grid">
+        {/* Left Column: Agenda & Actions */}
+        <div className="flight-deck-column">
+          {/* 1. Imminent Interview Rounds (next 48 hours) pinned at top */}
+          <section className="flight-deck-section" data-testid="imminent-rounds-section">
         <div className="kanban-column-header">
           <h3>
             Imminent Interview Rounds (Next 48 Hours){' '}
@@ -411,9 +454,12 @@ export function FlightDeckWorkspace() {
           </div>
         )}
       </section>
+        </div>
 
-      {/* 4. Stale Opportunities */}
-      <section className="flight-deck-section" data-testid="stale-opportunities-section">
+        {/* Right Column: Pipeline Triage & Staleness */}
+        <div className="flight-deck-column">
+          {/* 4. Stale Opportunities */}
+          <section className="flight-deck-section" data-testid="stale-opportunities-section">
         <div className="kanban-column-header">
           <h3>
             Pipeline Staleness Alerts{' '}
@@ -535,6 +581,8 @@ export function FlightDeckWorkspace() {
           </div>
         )}
       </section>
+        </div>
+      </div>
 
       {/* Modal: Log Interaction */}
       {logInteractionOpp && (
