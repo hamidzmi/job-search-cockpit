@@ -193,8 +193,31 @@ function installInterviewAndQuestionBankHandlers() {
     if (url.pathname === '/api/contacts' && method === 'GET') {
       return jsonResponse(contacts);
     }
+    if (url.pathname === '/api/contacts' && method === 'POST') {
+      const payload = JSON.parse(bodyText);
+      const newContact: Contact = {
+        id: `cnt-${++idCounter}`,
+        company_id: payload.company_id || 'comp-1',
+        company_name: 'Stripe',
+        name: payload.name,
+        title: payload.title || '',
+        email: payload.email || '',
+        linkedin_url: payload.linkedin_url || '',
+        warmth: payload.warmth || 'Warm',
+        notes: payload.notes || '',
+        linked_opportunities: [],
+        created_at: '2026-10-25T09:00:00Z',
+        updated_at: '2026-10-25T09:00:00Z',
+      };
+      contacts.push(newContact);
+      return jsonResponse(newContact, 201);
+    }
     if (url.pathname === '/api/opportunities/opp-1/contacts' && method === 'GET') {
       return jsonResponse([]);
+    }
+    if (url.pathname === '/api/opportunities/opp-1/contacts' && method === 'POST') {
+      const payload = JSON.parse(bodyText);
+      return jsonResponse(payload, 201);
     }
     if (url.pathname === '/api/interactions' && method === 'GET') {
       return jsonResponse([]);
@@ -600,5 +623,36 @@ describe('Interview Rounds, Loop Story De-duplication & Debrief Question Bank', 
     expect(
       within(questionBankSection).getByText(/Story: Zero-Downtime Ledger Sharding/i),
     ).toBeInTheDocument();
+  });
+
+  it('allows quick adding a new interviewer contact directly inside the Schedule Round section and auto-selects them', async () => {
+    const user = userEvent.setup();
+    installInterviewAndQuestionBankHandlers();
+
+    renderCockpit(['/opportunities/opp-1?tab=interviews']);
+
+    const roundsSection = await screen.findByRole('region', {
+      name: 'Opportunity Interview Rounds and Debriefs',
+    });
+
+    // Click "+ Quick Add Contact"
+    const quickAddBtn = within(roundsSection).getByRole('button', { name: '+ Quick Add Contact' });
+    await user.click(quickAddBtn);
+
+    const dialog = screen.getByRole('dialog', { name: 'Quick Add Interviewer' });
+    expect(dialog).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText('Contact Name'), 'Sarah Connor');
+    await user.type(within(dialog).getByLabelText('Contact Title'), 'Principal Infra Engineer');
+    await user.type(within(dialog).getByLabelText('Contact Email'), 'sarah@stripe.com');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add & Select Interviewer' }));
+
+    // Dialog closes and new contact is auto-selected
+    expect(screen.queryByRole('dialog', { name: 'Quick Add Interviewer' })).not.toBeInTheDocument();
+
+    const checkbox = await within(roundsSection).findByLabelText(/Interviewer Contact: Sarah Connor/i);
+    expect(checkbox).toBeInTheDocument();
+    expect(checkbox).toBeChecked();
   });
 });
