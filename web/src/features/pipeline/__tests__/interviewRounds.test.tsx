@@ -606,6 +606,7 @@ describe('Interview Rounds, Loop Story De-duplication & Debrief Question Bank', 
     await user.click(
       screen.getByRole('link', { name: /Candidate Profile & Story Bank/i }),
     );
+    await user.click(await screen.findByRole('tab', { name: /Question Bank/i }));
 
     const questionBankSection = await screen.findByRole('region', {
       name: 'Interview Question Bank',

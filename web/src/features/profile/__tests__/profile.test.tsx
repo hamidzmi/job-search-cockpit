@@ -145,7 +145,7 @@ function installStubbedProfileAndStoryHandlers(seed?: {
   return { fetchMock, getProfile: () => profile, getStories: () => stories };
 }
 
-function renderProfileWorkspace() {
+function renderProfileWorkspace(initialEntries = ['/profile']) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -156,7 +156,7 @@ function renderProfileWorkspace() {
   return render(
     <QueryClientProvider client={queryClient}>
       <CockpitApiProvider>
-        <MemoryRouter initialEntries={['/profile']}>
+        <MemoryRouter initialEntries={initialEntries}>
           <AppRoutes />
         </MemoryRouter>
       </CockpitApiProvider>
@@ -274,7 +274,7 @@ describe('Candidate Profile & Story Bank Workspace (/profile over /api/*)', () =
       ],
     });
 
-    renderProfileWorkspace();
+    renderProfileWorkspace(['/profile?tab=stories']);
 
     const storyBankSection = await screen.findByRole('region', { name: 'Story Bank' });
     expect(

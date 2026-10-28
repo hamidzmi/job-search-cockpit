@@ -142,22 +142,16 @@ export function StoryBankPanel() {
       ) : stories.length === 0 ? (
         <p className="timestamp-text">No Stories match the current filters.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div className="stories-grid">
           {stories.map((story) => (
-            <article key={story.id} className="panel-card">
+            <article key={story.id} className="panel-card story-card">
               <div className="card-top-row">
-                <div>
-                  <h4>{story.title}</h4>
-                  {story.hook && (
-                    <p style={{ margin: '0.25rem 0 0', fontWeight: 500, color: '#334155' }}>
-                      {story.hook}
-                    </p>
-                  )}
-                </div>
+                <h4 style={{ margin: 0, fontSize: '1rem' }}>{story.title}</h4>
                 <div className="workspace-actions">
                   <button
                     type="button"
                     className="btn-secondary"
+                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem' }}
                     onClick={() => setEditingStory(story)}
                   >
                     Edit Story
@@ -165,6 +159,7 @@ export function StoryBankPanel() {
                   <button
                     type="button"
                     className="btn-ghost"
+                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem' }}
                     onClick={() => deleteStoryMutation.mutate(story.id)}
                   >
                     Delete Story
@@ -172,30 +167,40 @@ export function StoryBankPanel() {
                 </div>
               </div>
 
-              <div className="form-grid" style={{ fontSize: '0.85rem' }}>
+              {story.hook && (
+                <div className="story-hook-banner">
+                  ⚡ &ldquo;{story.hook}&rdquo;
+                </div>
+              )}
+
+              <div className="star-grid">
                 {story.situation && (
-                  <div>
-                    <strong>Situation:</strong> {story.situation}
+                  <div className="star-line">
+                    <span className="star-label">Situation</span>
+                    <div>{story.situation}</div>
                   </div>
                 )}
                 {story.task && (
-                  <div>
-                    <strong>Task:</strong> {story.task}
+                  <div className="star-line">
+                    <span className="star-label">Task</span>
+                    <div>{story.task}</div>
                   </div>
                 )}
                 {story.action && (
-                  <div>
-                    <strong>Action:</strong> {story.action}
+                  <div className="star-line">
+                    <span className="star-label">Action</span>
+                    <div>{story.action}</div>
                   </div>
                 )}
                 {story.result && (
-                  <div>
-                    <strong>Result:</strong> {story.result}
+                  <div className="star-line">
+                    <span className="star-label">Result</span>
+                    <div style={{ fontWeight: 500, color: '#047857' }}>{story.result}</div>
                   </div>
                 )}
               </div>
 
-              <div className="tag-list">
+              <div className="tag-list" style={{ marginTop: 'auto', paddingTop: '0.35rem' }}>
                 {story.competency_tags.map((tag) => (
                   <span key={`comp-${tag}`} className="stage-badge">
                     {tag}
