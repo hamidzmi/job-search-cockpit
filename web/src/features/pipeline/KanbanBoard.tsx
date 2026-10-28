@@ -1,18 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { STAGES, type Opportunity, type Stage } from '../../api/types';
+import {
+  OUTCOMES,
+  STAGES,
+  type Opportunity,
+  type Outcome,
+  type Stage,
+} from '../../api/types';
 import { formatLocalDate } from '../../lib/date';
+
+interface ToastState {
+  message: string;
+  onUndo?: () => Promise<void>;
+}
 
 interface KanbanBoardProps {
   opportunities: Opportunity[];
   onMoveStage: (opportunityId: string, nextStage: Stage) => Promise<void>;
+  onChangeOutcome?: (
+    opportunityId: string,
+    nextOutcome: Outcome,
+    note?: string,
+  ) => Promise<void>;
 }
 
-export function KanbanBoard({ opportunities, onMoveStage }: KanbanBoardProps) {
+export function KanbanBoard({
+  opportunities,
+  onMoveStage,
+  onChangeOutcome,
+}: KanbanBoardProps) {
   const activeOpportunities = opportunities.filter((o) => o.outcome === 'Active');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
@@ -51,10 +80,34 @@ export function KanbanBoard({ opportunities, onMoveStage }: KanbanBoardProps) {
     if (!opp || opp.stage === targetStage) return;
 
     await onMoveStage(oppId, targetStage);
-    setToastMessage(`Moved ${opp.role_title} to ${targetStage}`);
-    setTimeout(() => {
-      setToastMessage((msg) => (msg?.includes(opp.role_title) ? null : msg));
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({
+      message: `Moved ${opp.role_title} to ${targetStage}`,
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
     }, 3500);
+  };
+
+  const handleOutcomeChange = async (opp: Opportunity, nextOutcome: Outcome) => {
+    if (nextOutcome === opp.outcome || !onChangeOutcome) return;
+    const previousOutcome = opp.outcome;
+    await onChangeOutcome(opp.id, nextOutcome);
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({
+      message: `Marked ${opp.role_title} as ${nextOutcome}`,
+      onUndo: async () => {
+        await onChangeOutcome(opp.id, previousOutcome, 'Reverted to Active (Undo)');
+      },
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 6000);
   };
 
   return (
@@ -125,18 +178,18 @@ export function KanbanBoard({ opportunities, onMoveStage }: KanbanBoardProps) {
                         <span className="timestamp-text">
                           Active {formatLocalDate(opp.last_activity_at)}
                         </span>
-                        <label className="stage-select-label">
-                          <span className="sr-only">Move {opp.role_title} Stage</span>
+                        <label className="outcome-select-label">
+                          <span className="sr-only">Set {opp.role_title} Outcome</span>
                           <select
-                            aria-label={`Move ${opp.role_title} Stage`}
-                            value={opp.stage}
+                            aria-label={`Set ${opp.role_title} Outcome`}
+                            value={opp.outcome}
                             onChange={(e) =>
-                              void onMoveStage(opp.id, e.target.value as Stage)
+                              void handleOutcomeChange(opp, e.target.value as Outcome)
                             }
                           >
-                            {STAGES.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
+                            {OUTCOMES.map((o) => (
+                              <option key={o} value={o}>
+                                {o}
                               </option>
                             ))}
                           </select>
@@ -151,7 +204,7 @@ export function KanbanBoard({ opportunities, onMoveStage }: KanbanBoardProps) {
         );
       })}
 
-      {toastMessage && (
+      {toast && (
         <div className="cockpit-toast" role="status" aria-live="polite">
           <svg
             width="18"
@@ -165,7 +218,22 @@ export function KanbanBoard({ opportunities, onMoveStage }: KanbanBoardProps) {
           >
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>{toastMessage}</span>
+          <span>{toast.message}</span>
+          {toast.onUndo && (
+            <button
+              type="button"
+              className="toast-undo-btn"
+              onClick={async () => {
+                const undoFn = toast.onUndo;
+                setToast(null);
+                if (undoFn) {
+                  await undoFn();
+                }
+              }}
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
     </div>

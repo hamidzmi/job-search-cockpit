@@ -671,11 +671,15 @@ describe('Pipeline Spine Workspace Views (over /api/* HTTP handlers)', () => {
     expect(screen.getByRole('navigation', { name: /Workspace Navigation/i })).toBeInTheDocument();
     expect(screen.queryByText('Staff Billing Engineer')).not.toBeInTheDocument();
 
-    const moveSelect = screen.getByLabelText('Move Staff Core Payments Engineer Stage');
-    await user.selectOptions(moveSelect, 'Outreach');
+    const outcomeSelect = screen.getByLabelText('Set Staff Core Payments Engineer Outcome');
+    await user.selectOptions(outcomeSelect, 'Rejected');
 
-    const outreachCol = screen.getByRole('region', { name: 'Outreach Stage Column' });
-    expect(await within(outreachCol).findByText('Staff Core Payments Engineer')).toBeInTheDocument();
+    expect(await screen.findByText(/Marked Staff Core Payments Engineer as Rejected/i)).toBeInTheDocument();
+    expect(screen.queryByText('Staff Core Payments Engineer')).not.toBeInTheDocument();
+
+    // Clicking Undo restores the card back to Active on the Kanban board
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(await screen.findByText('Staff Core Payments Engineer')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Table View' }));
     expect(await screen.findByText('Staff Billing Engineer')).toBeInTheDocument();

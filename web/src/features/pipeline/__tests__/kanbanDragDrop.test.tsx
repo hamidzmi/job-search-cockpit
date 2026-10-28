@@ -75,4 +75,41 @@ describe('KanbanBoard Drag and Drop & Minimalist Display', () => {
       await screen.findByText(/Moved Staff Frontend Infrastructure Engineer to Interviewing/i)
     ).toBeInTheDocument();
   });
+
+  it('allows changing outcome on an opportunity card and undoing the action', async () => {
+    const handleMoveStage = vi.fn().mockResolvedValue(undefined);
+    const handleChangeOutcome = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <KanbanBoard
+          opportunities={[mockOpportunity]}
+          onMoveStage={handleMoveStage}
+          onChangeOutcome={handleChangeOutcome}
+        />
+      </MemoryRouter>
+    );
+
+    const outcomeSelect = screen.getByLabelText('Set Staff Frontend Infrastructure Engineer Outcome');
+    expect(outcomeSelect).toHaveValue('Active');
+
+    fireEvent.change(outcomeSelect, { target: { value: 'Rejected' } });
+
+    expect(handleChangeOutcome).toHaveBeenCalledWith('opp-dnd-1', 'Rejected');
+
+    const toastText = await screen.findByText(
+      /Marked Staff Frontend Infrastructure Engineer as Rejected/i
+    );
+    expect(toastText).toBeInTheDocument();
+
+    const undoButton = screen.getByRole('button', { name: 'Undo' });
+    expect(undoButton).toBeInTheDocument();
+
+    fireEvent.click(undoButton);
+    expect(handleChangeOutcome).toHaveBeenCalledWith(
+      'opp-dnd-1',
+      'Active',
+      'Reverted to Active (Undo)'
+    );
+  });
 });

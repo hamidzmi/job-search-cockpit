@@ -5,6 +5,7 @@ import type {
   CompanyUpsertInput,
   OpportunityCreateInput,
   OpportunityFilter,
+  Outcome,
   Stage,
 } from '../../api/types';
 import { CompanyFormModal } from './CompanyFormModal';
@@ -71,6 +72,31 @@ export function PipelineWorkspace() {
     },
   });
 
+  const changeOutcomeMutation = useMutation({
+    mutationFn: ({
+      opportunityId,
+      nextOutcome,
+      note,
+    }: {
+      opportunityId: string;
+      nextOutcome: Outcome;
+      note?: string;
+    }) =>
+      api.opportunities.transitionOpportunity(opportunityId, {
+        outcome: nextOutcome,
+        note: note ?? `Marked as ${nextOutcome} on Kanban board`,
+      }),
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['opportunities'] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunity', variables.opportunityId] }),
+      ]);
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : 'Failed to transition Opportunity outcome');
+    },
+  });
+
   const handleCreateCompany = async (input: CompanyUpsertInput) => {
     await createCompanyMutation.mutateAsync(input);
   };
@@ -82,6 +108,15 @@ export function PipelineWorkspace() {
   const handleMoveStage = async (opportunityId: string, nextStage: Stage) => {
     setError(null);
     await moveStageMutation.mutateAsync({ opportunityId, nextStage });
+  };
+
+  const handleChangeOutcome = async (
+    opportunityId: string,
+    nextOutcome: Outcome,
+    note?: string,
+  ) => {
+    setError(null);
+    await changeOutcomeMutation.mutateAsync({ opportunityId, nextOutcome, note });
   };
 
   const companies = companiesQuery.data ?? [];
@@ -143,6 +178,7 @@ export function PipelineWorkspace() {
         <KanbanBoard
           opportunities={opportunities}
           onMoveStage={handleMoveStage}
+          onChangeOutcome={handleChangeOutcome}
         />
       ) : (
         <OpportunityTable
