@@ -195,7 +195,7 @@ export function StoryBankPanel() {
                 {story.result && (
                   <div className="star-line">
                     <span className="star-label">Result</span>
-                    <div style={{ fontWeight: 500, color: '#047857' }}>{story.result}</div>
+                    <div className="story-result-text">{story.result}</div>
                   </div>
                 )}
               </div>

@@ -321,7 +321,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{contacts.length}</div>
             <div className="hud-label">Global Contacts</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+          <div className="hud-icon-badge hud-badge-rounds">
             👥
           </div>
         </div>
@@ -331,7 +331,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{companies.length}</div>
             <div className="hud-label">Target Companies</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#f1f5f9', color: '#334155' }}>
+          <div className="hud-icon-badge hud-badge-stale">
             🏢
           </div>
         </div>
@@ -341,7 +341,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{openActionItems.length}</div>
             <div className="hud-label">Open Action Items</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#fef3c7', color: '#b45309' }}>
+          <div className="hud-icon-badge hud-badge-action">
             ⚡
           </div>
         </div>
@@ -351,7 +351,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{interactions.length}</div>
             <div className="hud-label">Logged Interactions</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#ecfdf5', color: '#047857' }}>
+          <div className="hud-icon-badge hud-badge-success">
             💬
           </div>
         </div>
