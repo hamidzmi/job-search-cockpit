@@ -689,7 +689,7 @@ describe('Pipeline Spine Workspace Views (over /api/* HTTP handlers)', () => {
     const user = userEvent.setup();
     installStubbedHttpHandlers();
 
-    renderCockpit(['/network']);
+    renderCockpit(['/network?tab=companies']);
 
     expect(await screen.findByText('No Companies added yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '+ New Company' }));
@@ -986,7 +986,8 @@ describe('Pipeline Spine Workspace Views (over /api/* HTTP handlers)', () => {
     await user.clear(searchInput);
     expect(await screen.findByRole('heading', { name: 'Alice Chen' })).toBeInTheDocument();
 
-    // 4. Navigate to Opportunity 1 (/opportunities/opp-1) and link Alice as Referrer
+    // 4. Navigate to Opportunity 1 (/opportunities/opp-1) via Companies tab and link Alice as Referrer
+    await user.click(screen.getByRole('tab', { name: /Companies/i }));
     await user.click(screen.getByRole('link', { name: 'Staff Core Payments Engineer' }));
     expect(
       await screen.findByRole('heading', { name: 'Staff Core Payments Engineer' }),

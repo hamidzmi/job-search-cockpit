@@ -1374,4 +1374,284 @@ body {
   align-items: center;
 }
 
+/* Warmth Badges */
+.warmth-badge {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  border-radius: 9999px;
+  line-height: 1.2;
+}
+
+.warmth-advocate {
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.warmth-warm {
+  background: #fffbeb !important;
+  color: #b45309 !important;
+  border: 1px solid #fde68a !important;
+}
+
+.warmth-neutral {
+  background: #f0f9ff !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+}
+
+.warmth-cold {
+  background: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* Network Workspace Enhancements */
+.contacts-grid,
+.company-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.15rem;
+  margin-top: 1rem;
+}
+
+.contact-card {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  padding: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+
+.contact-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.contact-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.contact-meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #0284c7;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.contact-meta-link:hover {
+  text-decoration: underline;
+}
+
+.contact-opps-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 0.6rem;
+}
+
+.contact-opps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.contact-opps-header h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-main);
+}
+
+.contact-opp-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.contact-opp-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  background: #f8fafc;
+  border-radius: 0.35rem;
+  border: 1px solid #f1f5f9;
+}
+
+.contact-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.interaction-count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: #f1f5f9;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.link-opp-compact-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.45rem;
+  padding: 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.link-opp-panel {
+  margin-top: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contact-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.contact-avatar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.contact-avatar {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 9999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #bae6fd;
+}
+
+/* Candidate Profile & Story Bank Enhancements */
+.stories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.15rem;
+  margin-top: 1rem;
+}
+
+.story-card {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+}
+
+.story-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.story-hook-banner {
+  background: #f0f9ff;
+  border-left: 3px solid #0284c7;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 0.35rem 0.35rem 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #0369a1;
+  font-style: italic;
+}
+
+.star-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  background: #f8fafc;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid #f1f5f9;
+}
+
+.star-line {
+  display: flex;
+  gap: 0.4rem;
+  line-height: 1.4;
+}
+
+.star-label {
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  min-width: 4.2rem;
+  flex-shrink: 0;
+}
+
+.profile-card-group {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  padding: 1.1rem;
+  margin-bottom: 1.25rem;
+}
+
+.work-history-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.55rem;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-left: 4px solid #0284c7;
+}
+
+
+
+
 

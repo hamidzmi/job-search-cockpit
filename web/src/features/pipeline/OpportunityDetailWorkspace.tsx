@@ -327,7 +327,11 @@ export function OpportunityDetailWorkspace() {
 
       {/* 2. Interviews Tab */}
       {activeTab === 'interviews' && (
-        <OpportunityInterviewRounds opportunityId={opportunity.id} />
+        <OpportunityInterviewRounds
+          opportunityId={opportunity.id}
+          companyId={opportunity.company_id}
+          companyName={opportunity.company_name}
+        />
       )}
 
       {/* 3. Fit & Artifacts Tab */}

@@ -171,110 +171,136 @@ export function CandidateProfilePanel() {
       {statusMessage && <div className="alert-success">{statusMessage}</div>}
       {errorMessage && <div className="alert-error">{errorMessage}</div>}
 
-      <form onSubmit={handleSubmit} className="form-grid">
-        <label className="form-field">
-          Full Name
-          <input
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Alex Rivera"
-          />
-        </label>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Group 1: Professional Positioning */}
+        <div className="profile-card-group" style={{ margin: 0 }}>
+          <h4 style={{ margin: '0 0 0.85rem', color: 'var(--text-main)' }}>
+            Professional Identity &amp; Positioning
+          </h4>
+          <div className="form-grid">
+            <label className="form-field">
+              Full Name
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Alex Rivera"
+              />
+            </label>
 
-        <label className="form-field">
-          Headline
-          <input
-            type="text"
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Staff Distributed Systems Engineer"
-          />
-        </label>
+            <label className="form-field">
+              Headline
+              <input
+                type="text"
+                value={headline}
+                onChange={(e) => setHeadline(e.target.value)}
+                placeholder="Staff Distributed Systems Engineer"
+              />
+            </label>
 
-        <label className="form-field form-field-full">
-          Profile Summary
-          <textarea
-            rows={3}
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder="Concise summary of core strengths, domain expertise, and career arc..."
-          />
-        </label>
+            <label className="form-field form-field-full">
+              Profile Summary
+              <textarea
+                rows={3}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Concise summary of core strengths, domain expertise, and career arc..."
+              />
+            </label>
 
-        <label className="form-field">
-          Skills (comma-separated)
-          <input
-            type="text"
-            value={skillsText}
-            onChange={(e) => setSkillsText(e.target.value)}
-            placeholder="Go, Rust, Kafka, PostgreSQL, Distributed Systems"
-          />
-        </label>
+            <label className="form-field">
+              Skills (comma-separated)
+              <input
+                type="text"
+                value={skillsText}
+                onChange={(e) => setSkillsText(e.target.value)}
+                placeholder="Go, Rust, Kafka, PostgreSQL, Distributed Systems"
+              />
+            </label>
 
-        <label className="form-field">
-          Target Role Titles (comma-separated)
-          <input
-            type="text"
-            value={targetRolesText}
-            onChange={(e) => setTargetRolesText(e.target.value)}
-            placeholder="Staff Backend Engineer, Principal Systems Engineer"
-          />
-        </label>
+            <label className="form-field">
+              Target Role Titles (comma-separated)
+              <input
+                type="text"
+                value={targetRolesText}
+                onChange={(e) => setTargetRolesText(e.target.value)}
+                placeholder="Staff Backend Engineer, Principal Systems Engineer"
+              />
+            </label>
 
-        <label className="form-field">
-          Location Preferences (comma-separated)
-          <input
-            type="text"
-            value={locationsText}
-            onChange={(e) => setLocationsText(e.target.value)}
-            placeholder="San Francisco, CA, Seattle, WA, Remote (US)"
-          />
-        </label>
+            <label className="form-field">
+              Location Preferences (comma-separated)
+              <input
+                type="text"
+                value={locationsText}
+                onChange={(e) => setLocationsText(e.target.value)}
+                placeholder="San Francisco, CA, Seattle, WA, Remote (US)"
+              />
+            </label>
 
-        <label className="form-field">
-          Remote Preference
-          <input
-            type="text"
-            value={remotePreference}
-            onChange={(e) => setRemotePreference(e.target.value)}
-            placeholder="Remote or Hybrid"
-          />
-        </label>
+            <label className="form-field">
+              Remote Preference
+              <input
+                type="text"
+                value={remotePreference}
+                onChange={(e) => setRemotePreference(e.target.value)}
+                placeholder="Remote or Hybrid"
+              />
+            </label>
+          </div>
+        </div>
 
-        <label className="form-field">
-          Minimum Compensation Floor
-          <input
-            type="number"
-            min={0}
-            value={compensationFloor}
-            onChange={(e) => setCompensationFloor(e.target.value)}
-          />
-        </label>
+        {/* Group 2: Compensation Architecture */}
+        <div className="profile-card-group" style={{ margin: 0 }}>
+          <div className="card-top-row" style={{ marginBottom: '0.85rem' }}>
+            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>
+              Compensation Architecture
+            </h4>
+            {Number(compensationFloor) > 0 && (
+              <span className="outcome-pill" style={{ fontWeight: 600 }}>
+                Floor: {currency} {Number(compensationFloor).toLocaleString()}
+              </span>
+            )}
+          </div>
+          <div className="form-grid">
+            <label className="form-field">
+              Minimum Compensation Floor
+              <input
+                type="number"
+                min={0}
+                value={compensationFloor}
+                onChange={(e) => setCompensationFloor(e.target.value)}
+              />
+            </label>
 
-        <label className="form-field">
-          Target Compensation
-          <input
-            type="number"
-            min={0}
-            value={targetCompensation}
-            onChange={(e) => setTargetCompensation(e.target.value)}
-          />
-        </label>
+            <label className="form-field">
+              Target Compensation
+              <input
+                type="number"
+                min={0}
+                value={targetCompensation}
+                onChange={(e) => setTargetCompensation(e.target.value)}
+              />
+            </label>
 
-        <label className="form-field">
-          Currency
-          <input
-            type="text"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            placeholder="USD"
-          />
-        </label>
+            <label className="form-field">
+              Currency
+              <input
+                type="text"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                placeholder="USD"
+              />
+            </label>
+          </div>
+        </div>
 
-        <div className="form-field-full">
-          <div className="card-top-row" style={{ marginBottom: '0.65rem' }}>
-            <h4>Work History &amp; Quantified Impact Bullets</h4>
+        {/* Group 3: Work History & Impact Bullets */}
+        <div className="profile-card-group" style={{ margin: 0 }}>
+          <div className="card-top-row" style={{ marginBottom: '0.85rem' }}>
+            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>
+              Work History &amp; Quantified Impact Bullets ({workHistory.length})
+            </h4>
             <button
               type="button"
               className="btn-secondary"
@@ -294,11 +320,14 @@ export function CandidateProfilePanel() {
                 <fieldset
                   key={idx}
                   aria-label={`Work History Entry ${idx + 1}`}
-                  className="panel-card"
+                  className="work-history-card"
                   style={{ margin: 0 }}
                 >
                   <div className="card-top-row">
-                    <strong>Role #{idx + 1}</strong>
+                    <strong>
+                      Role #{idx + 1}: {entry.title || 'Untitled Role'}{' '}
+                      {entry.company ? `@ ${entry.company}` : ''}
+                    </strong>
                     <button
                       type="button"
                       className="btn-ghost"

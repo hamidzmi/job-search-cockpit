@@ -14,10 +14,14 @@ import { formatLocalDateTime } from '../../lib/date';
 
 interface OpportunityInterviewRoundsProps {
   opportunityId: string;
+  companyId?: string;
+  companyName?: string;
 }
 
 export function OpportunityInterviewRounds({
   opportunityId,
+  companyId,
+  companyName,
 }: OpportunityInterviewRoundsProps) {
   const api = useCockpitApi();
   const queryClient = useQueryClient();
@@ -32,6 +36,15 @@ export function OpportunityInterviewRounds({
   const [prepNotes, setPrepNotes] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [selectedStoryIds, setSelectedStoryIds] = useState<string[]>([]);
+
+  // Quick Add Contact Modal State
+  const [showQuickContactModal, setShowQuickContactModal] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickEmail, setQuickEmail] = useState('');
+  const [quickLinkedin, setQuickLinkedin] = useState('');
+  const [quickContactSubmitting, setQuickContactSubmitting] = useState(false);
+  const [quickContactError, setQuickContactError] = useState<string | null>(null);
 
   const [debriefRound, setDebriefRound] = useState<InterviewRound | null>(null);
   const [questionsAsked, setQuestionsAsked] = useState<DebriefQuestionInput[]>([]);
@@ -204,6 +217,53 @@ export function OpportunityInterviewRounds({
     setSelectedStoryIds((prev) =>
       prev.includes(storyId) ? prev.filter((id) => id !== storyId) : [...prev, storyId],
     );
+  };
+
+  const handleQuickContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim()) return;
+    setQuickContactError(null);
+    setQuickContactSubmitting(true);
+    try {
+      const createdContact = await api.contacts.createContact({
+        name: quickName.trim(),
+        company_id: companyId || '',
+        title: quickTitle.trim(),
+        email: quickEmail.trim(),
+        linkedin_url: quickLinkedin.trim(),
+        warmth: 'Warm',
+        notes: '',
+      });
+
+      try {
+        await api.contacts.linkContactToOpportunity(opportunityId, {
+          contact_id: createdContact.id,
+          role: 'Interviewer',
+        });
+      } catch {
+        // Non-blocking if linking is already present or optional
+      }
+
+      setSelectedContactIds((prev) =>
+        prev.includes(createdContact.id) ? prev : [...prev, createdContact.id]
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunity-contacts', opportunityId] }),
+        queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] }),
+      ]);
+
+      setQuickName('');
+      setQuickTitle('');
+      setQuickEmail('');
+      setQuickLinkedin('');
+      setShowQuickContactModal(false);
+    } catch (err) {
+      setQuickContactError(err instanceof Error ? err.message : 'Failed to create Contact');
+    } finally {
+      setQuickContactSubmitting(false);
+    }
   };
 
   return (
@@ -526,7 +586,20 @@ export function OpportunityInterviewRounds({
           </label>
 
           <div className="form-field">
-            <span>Participating Interviewer Contacts</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+              <span>Participating Interviewer Contacts</span>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.2rem 0.55rem', fontSize: '0.75rem' }}
+                onClick={() => {
+                  setQuickContactError(null);
+                  setShowQuickContactModal(true);
+                }}
+              >
+                + Quick Add Contact
+              </button>
+            </div>
             {allContacts.length === 0 ? (
               <p className="timestamp-text">No Contacts in directory yet.</p>
             ) : (
@@ -822,6 +895,102 @@ export function OpportunityInterviewRounds({
                 </button>
                 <button type="submit" className="btn-primary">
                   Save Debrief
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showQuickContactModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Quick Add Interviewer"
+        >
+          <div className="modal-card" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Quick Add Interviewer</h3>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowQuickContactModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="panel-hint" style={{ marginTop: 0 }}>
+              Add a new interviewer{companyName ? ` to ${companyName}` : ''}. They will be automatically linked as an Interviewer and selected for this round.
+            </p>
+
+            {quickContactError && (
+              <div className="alert-error" role="alert">
+                {quickContactError}
+              </div>
+            )}
+
+            <form onSubmit={handleQuickContactSubmit} className="form-grid">
+              <label className="form-field form-field-full">
+                <span>Full Name *</span>
+                <input
+                  type="text"
+                  required
+                  aria-label="Contact Name"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  placeholder="e.g., Sarah Connor"
+                  autoFocus
+                />
+              </label>
+
+              <label className="form-field form-field-full">
+                <span>Role / Title</span>
+                <input
+                  type="text"
+                  aria-label="Contact Title"
+                  value={quickTitle}
+                  onChange={(e) => setQuickTitle(e.target.value)}
+                  placeholder="e.g., Staff Distributed Systems Engineer"
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  aria-label="Contact Email"
+                  value={quickEmail}
+                  onChange={(e) => setQuickEmail(e.target.value)}
+                  placeholder="sarah@company.com"
+                />
+              </label>
+
+              <label className="form-field">
+                <span>LinkedIn URL</span>
+                <input
+                  type="url"
+                  aria-label="Contact LinkedIn"
+                  value={quickLinkedin}
+                  onChange={(e) => setQuickLinkedin(e.target.value)}
+                  placeholder="https://linkedin.com/in/sarah"
+                />
+              </label>
+
+              <div className="modal-actions form-field-full" style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowQuickContactModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={quickContactSubmitting}
+                >
+                  {quickContactSubmitting ? 'Saving...' : 'Add & Select Interviewer'}
                 </button>
               </div>
             </form>
