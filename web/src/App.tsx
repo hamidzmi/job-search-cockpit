@@ -8,20 +8,23 @@ import { OpportunityDetailWorkspace } from './features/pipeline/OpportunityDetai
 import { PipelineWorkspace } from './features/pipeline/PipelineWorkspace';
 import { ProfileWorkspace } from './features/profile/ProfileWorkspace';
 import { SettingsWorkspace } from './features/settings/SettingsWorkspace';
+import { ThemeProvider } from './lib/theme';
 
 export function AppRoutes() {
   return (
-    <Routes>
-      <Route element={<AppShell />}>
-        <Route path="/" element={<FlightDeckWorkspace />} />
-        <Route path="/opportunities" element={<PipelineWorkspace />} />
-        <Route path="/opportunities/:id" element={<OpportunityDetailWorkspace />} />
-        <Route path="/network" element={<NetworkWorkspace />} />
-        <Route path="/profile" element={<ProfileWorkspace />} />
-        <Route path="/analytics" element={<AnalyticsWorkspace />} />
-        <Route path="/settings" element={<SettingsWorkspace />} />
-        <Route path="*" element={<Navigate to="/opportunities" replace />} />
-      </Route>
-    </Routes>
+    <ThemeProvider>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<FlightDeckWorkspace />} />
+          <Route path="/opportunities" element={<PipelineWorkspace />} />
+          <Route path="/opportunities/:id" element={<OpportunityDetailWorkspace />} />
+          <Route path="/network" element={<NetworkWorkspace />} />
+          <Route path="/profile" element={<ProfileWorkspace />} />
+          <Route path="/analytics" element={<AnalyticsWorkspace />} />
+          <Route path="/settings" element={<SettingsWorkspace />} />
+          <Route path="*" element={<Navigate to="/opportunities" replace />} />
+        </Route>
+      </Routes>
+    </ThemeProvider>
   );
 }

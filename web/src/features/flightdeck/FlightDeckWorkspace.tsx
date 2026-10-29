@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileEdit,
+  Flame,
+  MessageSquare,
+  Sparkles,
+  TrendingUp,
+  X,
+} from 'lucide-react';
 import { useCockpitApi } from '../../api/CockpitApiContext';
 import type {
   InteractionDirection,
@@ -10,6 +24,8 @@ import type {
   StaleOpportunity,
 } from '../../api/types';
 import { OUTCOMES, STAGES } from '../../api/types';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
 import { formatLocalDateTime } from '../../lib/date';
 
 export function FlightDeckWorkspace() {
@@ -153,7 +169,7 @@ export function FlightDeckWorkspace() {
   if (isLoading) {
     return (
       <div className="workspace-container">
-        <p>Loading Flight Deck...</p>
+        <p className="text-muted-foreground text-sm">Loading Flight Deck...</p>
       </div>
     );
   }
@@ -192,8 +208,8 @@ export function FlightDeckWorkspace() {
             <div className="hud-value">{action_items.length}</div>
             <div className="hud-label">Action Items</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#fef3c7', color: '#b45309' }}>
-            ⚡
+          <div className="hud-icon-badge hud-badge-action">
+            <Clock className="w-5 h-5" />
           </div>
         </div>
         <div className="hud-card">
@@ -201,8 +217,8 @@ export function FlightDeckWorkspace() {
             <div className="hud-value">{upcoming_rounds.length}</div>
             <div className="hud-label">Upcoming Rounds</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
-            📅
+          <div className="hud-icon-badge hud-badge-rounds">
+            <Calendar className="w-5 h-5" />
           </div>
         </div>
         <div className="hud-card">
@@ -210,8 +226,8 @@ export function FlightDeckWorkspace() {
             <div className="hud-value">{missing_debriefs.length}</div>
             <div className="hud-label">Debriefs Needed</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#fee2e2', color: '#be123c' }}>
-            ✍️
+          <div className="hud-icon-badge hud-badge-debriefs">
+            <FileEdit className="w-5 h-5" />
           </div>
         </div>
         <div className="hud-card">
@@ -219,8 +235,8 @@ export function FlightDeckWorkspace() {
             <div className="hud-value">{stale_opportunities.length}</div>
             <div className="hud-label">Stale Alerts</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#f1f5f9', color: '#475569' }}>
-            ⚠️
+          <div className="hud-icon-badge hud-badge-stale">
+            <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -228,359 +244,372 @@ export function FlightDeckWorkspace() {
       <div className="flight-deck-grid">
         {/* Left Column: Agenda & Actions */}
         <div className="flight-deck-column">
-          {/* 1. Imminent Interview Rounds (next 48 hours) pinned at top */}
-          <section className="flight-deck-section" data-testid="imminent-rounds-section">
-        <div className="kanban-column-header">
-          <h3>
-            Imminent Interview Rounds (Next 48 Hours){' '}
-            <span className="badge-count">{upcoming_rounds.length}</span>
-          </h3>
-        </div>
-        {upcoming_rounds.length === 0 ? (
-          <div className="panel-card text-muted">
-            No interview rounds scheduled in the next 48 hours.
-          </div>
-        ) : (
-          <div className="timeline-list">
-            {upcoming_rounds.map((round) => (
-              <div
-                key={round.id}
-                className="panel-card"
-                data-testid={`upcoming-round-${round.id}`}
-                style={{ borderLeft: '4px solid #0284c7' }}
-              >
-                <div className="card-top-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="company-pill">{round.company_name}</span>
-                    <strong>{round.opportunity_role_title}</strong>
-                  </div>
-                  <span className="stage-badge">{round.round_type}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4 style={{ margin: '0.25rem 0' }}>{round.title}</h4>
-                    <p style={{ margin: '0.15rem 0', color: '#475569', fontSize: '0.85rem' }}>
-                      🕒 {formatLocalDateTime(round.scheduled_at)} ({round.duration_minutes} min)
-                    </p>
-                  </div>
-                  <Link
-                    to={`/opportunities/${round.opportunity_id}?tab=interviews`}
-                    className="btn-primary"
-                    aria-label={`Prepare for ${round.title}`}
+          {/* Action Items */}
+          <section className="flight-deck-section" data-testid="action-items-section">
+            <div className="kanban-column-header">
+              <h3>
+                Action Items <span className="badge-count">{action_items.length}</span>
+              </h3>
+            </div>
+            {action_items.length === 0 ? (
+              <div className="panel-card text-muted">No pending action items.</div>
+            ) : (
+              <div className="timeline-list">
+                {action_items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="panel-card"
+                    data-testid={`action-item-${item.id}`}
+                    style={{
+                      borderLeft: item.is_overdue
+                        ? '4px solid #ef4444'
+                        : item.is_due_today
+                        ? '4px solid #f59e0b'
+                        : '4px solid #cbd5e1',
+                    }}
                   >
-                    Prepare for Round
-                  </Link>
-                </div>
+                    <div className="card-top-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {item.company_name && (
+                          <span className="company-pill">{item.company_name}</span>
+                        )}
+                        {item.opportunity_role_title && (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            {item.opportunity_role_title}
+                          </span>
+                        )}
+                        {item.contact_name && (
+                          <span className="tech-tag">Contact: {item.contact_name}</span>
+                        )}
+                      </div>
+                      <div>
+                        {item.is_overdue && (
+                          <span
+                            className="priority-badge badge-overdue"
+                            style={{ marginRight: '0.35rem' }}
+                          >
+                            Overdue
+                          </span>
+                        )}
+                        {item.is_due_today && (
+                          <span className="priority-badge badge-due-today">
+                            Due Today
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                  <div>
-                    <span style={{ fontWeight: 600, color: '#64748b' }}>Interviewers: </span>
-                    {round.interviewer_names && round.interviewer_names.length > 0 ? (
-                      round.interviewer_names.map((name) => (
-                        <span key={name} className="tech-tag" style={{ marginRight: '0.35rem' }}>
-                          {name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted">None linked</span>
-                    )}
-                  </div>
-                  <div>
-                    <span style={{ fontWeight: 600, color: '#64748b' }}>Stories: </span>
-                    {round.story_titles && round.story_titles.length > 0 ? (
-                      round.story_titles.map((title) => (
-                        <span key={title} className="tech-tag" style={{ marginRight: '0.35rem' }}>
-                          {title}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted">None linked</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 2. Missing Debriefs on Past/Completed Rounds */}
-      <section className="flight-deck-section" data-testid="missing-debriefs-section">
-        <div className="kanban-column-header">
-          <h3>
-            Completed Rounds Missing Debrief{' '}
-            <span
-              className="badge-count"
-              style={
-                missing_debriefs.length > 0
-                  ? { background: '#fef3c7', color: '#92400e' }
-                  : undefined
-              }
-            >
-              {missing_debriefs.length}
-            </span>
-          </h3>
-        </div>
-        {missing_debriefs.length === 0 ? (
-          <div className="panel-card text-muted">
-            All completed interview rounds have debriefs recorded.
-          </div>
-        ) : (
-          <div className="timeline-list">
-            {missing_debriefs.map((round) => (
-              <div
-                key={round.id}
-                className="panel-card"
-                data-testid={`missing-debrief-${round.id}`}
-                style={{ borderLeft: '4px solid #f59e0b', background: '#fffbeb' }}
-              >
-                <div className="card-top-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="company-pill">{round.company_name}</span>
-                    <strong>{round.opportunity_role_title}</strong>
-                  </div>
-                  <span className="priority-badge" style={{ background: '#fde68a', color: '#92400e' }}>
-                    Debrief Needed
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4 style={{ margin: '0.25rem 0' }}>{round.title} ({round.round_type})</h4>
-                    <p style={{ margin: 0, color: '#78350f', fontSize: '0.85rem' }}>
-                      Completed {formatLocalDateTime(round.scheduled_at)} — log questions and reflection while fresh.
-                    </p>
-                  </div>
-                  <Link
-                    to={`/opportunities/${round.opportunity_id}?tab=interviews`}
-                    className="btn-primary"
-                    aria-label={`Log Debrief for ${round.title}`}
-                  >
-                    Log Debrief
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* 3. Open Action Items ordered by due date */}
-      <section className="flight-deck-section" data-testid="action-items-section">
-        <div className="kanban-column-header">
-          <h3>
-            Action Items <span className="badge-count">{action_items.length}</span>
-          </h3>
-        </div>
-        {action_items.length === 0 ? (
-          <div className="panel-card text-muted">No pending action items.</div>
-        ) : (
-          <div className="timeline-list">
-            {action_items.map((item) => (
-              <div
-                key={item.id}
-                className="panel-card"
-                data-testid={`action-item-${item.id}`}
-                style={{
-                  borderLeft: item.is_overdue
-                    ? '4px solid #ef4444'
-                    : item.is_due_today
-                    ? '4px solid #f59e0b'
-                    : '4px solid #cbd5e1',
-                }}
-              >
-                <div className="card-top-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {item.company_name && (
-                      <span className="company-pill">{item.company_name}</span>
-                    )}
-                    {item.opportunity_role_title && (
-                      <span style={{ fontSize: '0.85rem', color: '#475569' }}>
-                        {item.opportunity_role_title}
-                      </span>
-                    )}
-                    {item.contact_name && (
-                      <span className="tech-tag">Contact: {item.contact_name}</span>
-                    )}
-                  </div>
-                  <div>
-                    {item.is_overdue && (
-                      <span
-                        className="priority-badge"
-                        style={{ background: '#fee2e2', color: '#991b1b', marginRight: '0.35rem' }}
-                      >
-                        Overdue
-                      </span>
-                    )}
-                    {item.is_due_today && (
-                      <span
-                        className="priority-badge"
-                        style={{ background: '#fef3c7', color: '#92400e' }}
-                      >
-                        Due Today
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <h4 style={{ margin: '0.25rem 0' }}>{item.title}</h4>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Due: {formatLocalDateTime(item.due_at)}
-                    </p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => completeActionItemMutation.mutate(item)}
-                      aria-label={`Complete ${item.title}`}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
                     >
-                      Complete
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => snoozeActionItemMutation.mutate({ item, days: 1 })}
-                      aria-label={`Snooze ${item.title} 1 day`}
-                    >
-                      Snooze (+1d)
-                    </button>
+                      <div>
+                        <h4 style={{ margin: '0.25rem 0' }}>{item.title}</h4>
+                        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          Due: {formatLocalDateTime(item.due_at)}
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => completeActionItemMutation.mutate(item)}
+                          aria-label={`Complete ${item.title}`}
+                        >
+                          Complete
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => snoozeActionItemMutation.mutate({ item, days: 1 })}
+                          aria-label={`Snooze ${item.title} 1 day`}
+                        >
+                          Snooze (+1d)
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-        </div>
+            )}
+          </section>
 
-        {/* Right Column: Pipeline Triage & Staleness */}
-        <div className="flight-deck-column">
-          {/* 4. Stale Opportunities */}
+          {/* Pipeline Staleness Alerts */}
           <section className="flight-deck-section" data-testid="stale-opportunities-section">
-        <div className="kanban-column-header">
-          <h3>
-            Pipeline Staleness Alerts{' '}
-            <span
-              className="badge-count"
-              style={
-                stale_opportunities.length > 0
-                  ? { background: '#fee2e2', color: '#991b1b' }
-                  : undefined
-              }
-            >
-              {stale_opportunities.length}
-            </span>
-          </h3>
-        </div>
-        {stale_opportunities.length === 0 ? (
-          <div className="panel-card text-muted">
-            No stale opportunities — your pipeline is fully up to date!
-          </div>
-        ) : (
-          <div className="timeline-list">
-            {stale_opportunities.map((opp) => (
-              <div
-                key={opp.opportunity_id}
-                className="panel-card"
-                data-testid={`stale-opp-${opp.opportunity_id}`}
-                style={{ borderLeft: '4px solid #ef4444' }}
-              >
-                <div className="card-top-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="company-pill">{opp.company_name}</span>
-                    <Link
-                      to={`/opportunities/${opp.opportunity_id}`}
-                      style={{ fontWeight: 700, textDecoration: 'none', color: '#0f172a' }}
-                    >
-                      {opp.role_title}
-                    </Link>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    <span className="stage-badge">{opp.stage}</span>
-                    <span className="priority-badge">{opp.priority}</span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    color: '#b91c1c',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    margin: '0.35rem 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
+            <div className="kanban-column-header">
+              <h3>
+                Pipeline Staleness Alerts{' '}
+                <span
+                  className={`badge-count ${stale_opportunities.length > 0 ? 'badge-stale-alert' : ''}`}
                 >
-                  <span>⚠️ {opp.stale_reason}</span>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 400 }}>
-                    ({opp.days_stale} days idle)
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginTop: '0.5rem',
-                    borderTop: '1px solid #f1f5f9',
-                    paddingTop: '0.5rem',
-                  }}
-                >
-                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                    Last activity: {formatLocalDateTime(opp.last_activity_at)}
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={() => {
-                        setLogInteractionOpp(opp);
-                        setIntContactId(contacts[0]?.id || '');
-                        setIntSummary('');
-                      }}
-                      aria-label={`Log Interaction for ${opp.role_title}`}
-                    >
-                      Log Interaction
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => {
-                        setStageModalOpp(opp);
-                        // Pick next stage by default
-                        const idx = STAGES.indexOf(opp.stage);
-                        const next = idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1] : opp.stage;
-                        setTargetStage(next);
-                        setStageNote('');
-                      }}
-                      aria-label={`Advance Stage for ${opp.role_title}`}
-                    >
-                      Advance Stage
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => {
-                        setOutcomeModalOpp(opp);
-                        setTargetOutcome('Ghosted');
-                        setOutcomeNote('');
-                      }}
-                      aria-label={`Update Outcome for ${opp.role_title}`}
-                    >
-                      Update Outcome
-                    </button>
-                  </div>
-                </div>
+                  {stale_opportunities.length}
+                </span>
+              </h3>
+            </div>
+            {stale_opportunities.length === 0 ? (
+              <div className="panel-card text-muted">
+                No stale opportunities — your pipeline is fully up to date!
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            ) : (
+              <div className="timeline-list">
+                {stale_opportunities.map((opp) => (
+                  <div
+                    key={opp.opportunity_id}
+                    className="panel-card"
+                    data-testid={`stale-opp-${opp.opportunity_id}`}
+                    style={{ borderLeft: '4px solid #ef4444' }}
+                  >
+                    <div className="card-top-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="company-pill">{opp.company_name}</span>
+                        <Link
+                          to={`/opportunities/${opp.opportunity_id}`}
+                          className="card-title-link"
+                        >
+                          {opp.role_title}
+                        </Link>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <span className="stage-badge">{opp.stage}</span>
+                        <span className="priority-badge">{opp.priority}</span>
+                      </div>
+                    </div>
+
+                    <div className="stale-reason-text">
+                      <span>⚠️ {opp.stale_reason}</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                        ({opp.days_stale} days idle)
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '0.5rem',
+                        borderTop: '1px solid var(--border)',
+                        paddingTop: '0.5rem',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Last activity: {formatLocalDateTime(opp.last_activity_at)}
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => {
+                            setLogInteractionOpp(opp);
+                            setIntContactId(contacts[0]?.id || '');
+                            setIntSummary('');
+                          }}
+                          aria-label={`Log Interaction for ${opp.role_title}`}
+                        >
+                          Log Interaction
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            setStageModalOpp(opp);
+                            const idx = STAGES.indexOf(opp.stage);
+                            const next =
+                              idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1] : opp.stage;
+                            setTargetStage(next);
+                            setStageNote('');
+                          }}
+                          aria-label={`Advance Stage for ${opp.role_title}`}
+                        >
+                          Advance Stage
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => {
+                            setOutcomeModalOpp(opp);
+                            setTargetOutcome('Ghosted');
+                            setOutcomeNote('');
+                          }}
+                          aria-label={`Update Outcome for ${opp.role_title}`}
+                        >
+                          Update Outcome
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Right Column: Interviews & Debriefs */}
+        <div className="flight-deck-column">
+          {/* Imminent Interview Rounds (next 48 hours) */}
+          <section className="flight-deck-section" data-testid="imminent-rounds-section">
+            <div className="kanban-column-header">
+              <h3>
+                Imminent Interview Rounds (Next 48 Hours){' '}
+                <span className="badge-count">{upcoming_rounds.length}</span>
+              </h3>
+            </div>
+            {upcoming_rounds.length === 0 ? (
+              <div className="panel-card text-muted">
+                No interview rounds scheduled in the next 48 hours.
+              </div>
+            ) : (
+              <div className="timeline-list">
+                {upcoming_rounds.map((round) => (
+                  <div
+                    key={round.id}
+                    className="panel-card"
+                    data-testid={`upcoming-round-${round.id}`}
+                    style={{ borderLeft: '4px solid #0284c7' }}
+                  >
+                    <div className="card-top-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="company-pill">{round.company_name}</span>
+                        <strong>{round.opportunity_role_title}</strong>
+                      </div>
+                      <span className="stage-badge">{round.round_type}</span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <h4 style={{ margin: '0.25rem 0' }}>{round.title}</h4>
+                        <p style={{ margin: '0.15rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                          🕒 {formatLocalDateTime(round.scheduled_at)} ({round.duration_minutes}{' '}
+                          min)
+                        </p>
+                      </div>
+                      <Link
+                        to={`/opportunities/${round.opportunity_id}?tab=interviews`}
+                        className="btn-primary"
+                        aria-label={`Prepare for ${round.title}`}
+                      >
+                        Prepare for Round
+                      </Link>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '1.5rem',
+                        fontSize: '0.82rem',
+                        marginTop: '0.35rem',
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Interviewers: </span>
+                        {round.interviewer_names && round.interviewer_names.length > 0 ? (
+                          round.interviewer_names.map((name) => (
+                            <span
+                              key={name}
+                              className="tech-tag"
+                              style={{ marginRight: '0.35rem' }}
+                            >
+                              {name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-muted">None linked</span>
+                        )}
+                      </div>
+                      <div>
+                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Stories: </span>
+                        {round.story_titles && round.story_titles.length > 0 ? (
+                          round.story_titles.map((title) => (
+                            <span
+                              key={title}
+                              className="tech-tag"
+                              style={{ marginRight: '0.35rem' }}
+                            >
+                              {title}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-muted">None linked</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Missing Debriefs on Past/Completed Rounds */}
+          <section className="flight-deck-section" data-testid="missing-debriefs-section">
+            <div className="kanban-column-header">
+              <h3>
+                Completed Rounds Missing Debrief{' '}
+                <span
+                  className={`badge-count ${missing_debriefs.length > 0 ? 'badge-warning-alert' : ''}`}
+                >
+                  {missing_debriefs.length}
+                </span>
+              </h3>
+            </div>
+            {missing_debriefs.length === 0 ? (
+              <div className="panel-card text-muted">
+                All completed interview rounds have debriefs recorded.
+              </div>
+            ) : (
+              <div className="timeline-list">
+                {missing_debriefs.map((round) => (
+                  <div
+                    key={round.id}
+                    className="panel-card panel-card-debrief"
+                    data-testid={`missing-debrief-${round.id}`}
+                  >
+                    <div className="card-top-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="company-pill">{round.company_name}</span>
+                        <strong>{round.opportunity_role_title}</strong>
+                      </div>
+                      <span className="priority-badge badge-debrief-needed">
+                        Debrief Needed
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <h4 style={{ margin: '0.25rem 0' }}>
+                          {round.title} ({round.round_type})
+                        </h4>
+                        <p className="debrief-hint-text">
+                          Completed {formatLocalDateTime(round.scheduled_at)} — log questions and
+                          reflection while fresh.
+                        </p>
+                      </div>
+                      <Link
+                        to={`/opportunities/${round.opportunity_id}?tab=interviews`}
+                        className="btn-primary"
+                        aria-label={`Log Debrief for ${round.title}`}
+                      >
+                        Log Debrief
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
 

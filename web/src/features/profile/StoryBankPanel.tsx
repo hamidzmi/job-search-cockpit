@@ -3,6 +3,8 @@ import React, { useMemo, useState } from 'react';
 import { useCockpitApi } from '../../api/CockpitApiContext';
 import type { Story, StoryFilter, StoryUpsertInput } from '../../api/types';
 import { StoryFormModal } from './StoryFormModal';
+import { Button } from '../../components/ui/Button';
+import { Pencil, Trash2 } from 'lucide-react';
 
 const DEFAULT_COMPETENCY_TAGS = [
   'Leadership',
@@ -147,23 +149,28 @@ export function StoryBankPanel() {
             <article key={story.id} className="panel-card story-card">
               <div className="card-top-row">
                 <h4 style={{ margin: 0, fontSize: '1rem' }}>{story.title}</h4>
-                <div className="workspace-actions">
-                  <button
+                <div className="workspace-actions flex items-center gap-1">
+                  <Button
                     type="button"
-                    className="btn-secondary"
-                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem' }}
+                    variant="outline"
+                    size="icon-xs"
+                    aria-label="Edit Story"
+                    title="Edit Story"
                     onClick={() => setEditingStory(story)}
                   >
-                    Edit Story
-                  </button>
-                  <button
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  <Button
                     type="button"
-                    className="btn-ghost"
-                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.78rem' }}
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Delete Story"
+                    title="Delete Story"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => deleteStoryMutation.mutate(story.id)}
                   >
-                    Delete Story
-                  </button>
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 </div>
               </div>
 
@@ -195,7 +202,7 @@ export function StoryBankPanel() {
                 {story.result && (
                   <div className="star-line">
                     <span className="star-label">Result</span>
-                    <div style={{ fontWeight: 500, color: '#047857' }}>{story.result}</div>
+                    <div className="story-result-text">{story.result}</div>
                   </div>
                 )}
               </div>

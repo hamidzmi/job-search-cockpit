@@ -382,11 +382,12 @@ export function OpportunityInterviewRounds({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.4rem',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            background: 'var(--bg-subtle)',
+                            border: '1px solid var(--border)',
                             borderRadius: '0.45rem',
                             padding: '0.25rem 0.55rem',
                             fontSize: '0.82rem',
+                            color: 'var(--text-main)',
                           }}
                         >
                           <span>{st.title}</span>
@@ -411,39 +412,39 @@ export function OpportunityInterviewRounds({
                 {r.debrief && (
                   <div className="debrief-summary-box">
                     <div className="timeline-header">
-                      <strong style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <strong style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <span>✓</span> Debrief Completed
                       </strong>
-                      <span className="priority-badge" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
+                      <span className="priority-badge warmth-advocate">
                         Confidence: {r.debrief.confidence_score} / 5
                       </span>
                     </div>
                     {r.debrief.went_well && (
-                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem' }}>
                         <strong>Went Well:</strong> {r.debrief.went_well}
                       </p>
                     )}
                     {r.debrief.to_improve && (
-                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem' }}>
                         <strong>To Improve:</strong> {r.debrief.to_improve}
                       </p>
                     )}
                     {r.debrief.signals && (
-                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem' }}>
                         <strong>Signals:</strong> {r.debrief.signals}
                       </p>
                     )}
                     {r.debrief.follow_up_notes && (
-                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem', color: '#14532d' }}>
+                      <p style={{ margin: '0.2rem 0', fontSize: '0.84rem' }}>
                         <strong>Follow-up:</strong> {r.debrief.follow_up_notes}
                       </p>
                     )}
                     {r.debrief.questions_asked.length > 0 && (
-                      <div style={{ marginTop: '0.35rem', borderTop: '1px solid #bbf7d0', paddingTop: '0.35rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534' }}>
+                      <div className="debrief-questions-divider">
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>
                           Questions Recorded ({r.debrief.questions_asked.length}):
                         </span>
-                        <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.82rem', color: '#14532d' }}>
+                        <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem', fontSize: '0.82rem' }}>
                           {r.debrief.questions_asked.map((q, idx) => (
                             <li key={idx}>
                               <strong>{q.question}</strong> {q.category && `[${q.category}]`}
@@ -465,9 +466,6 @@ export function OpportunityInterviewRounds({
         className="panel-card"
         style={{
           marginTop: '1.75rem',
-          background: '#ffffff',
-          borderRadius: '0.75rem',
-          border: '1px solid var(--border-subtle)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -610,10 +608,11 @@ export function OpportunityInterviewRounds({
                   gap: '0.35rem',
                   maxHeight: '140px',
                   overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   borderRadius: '0.45rem',
                   padding: '0.5rem',
-                  background: '#f8fafc',
+                  background: 'var(--bg-subtle)',
+                  color: 'var(--text-main)',
                 }}
               >
                 {allContacts.map((c) => (
@@ -643,10 +642,11 @@ export function OpportunityInterviewRounds({
                   gap: '0.4rem',
                   maxHeight: '140px',
                   overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   borderRadius: '0.45rem',
                   padding: '0.5rem',
-                  background: '#f8fafc',
+                  background: 'var(--bg-subtle)',
+                  color: 'var(--text-main)',
                 }}
               >
                 {allStories.map((st) => {

@@ -1,85 +1,93 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import {
+  BarChart3,
+  Compass,
+  FileText,
+  Kanban,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Settings,
+  Sun,
+  Users,
+} from 'lucide-react';
 import { QuickCaptureModal } from '../../features/quick-capture/QuickCaptureModal';
+import { useTheme } from '../../lib/theme';
 
 const NAV_ITEMS = [
   {
     to: '/',
     label: 'Flight Deck',
     end: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-      </svg>
-    ),
+    icon: Compass,
   },
   {
     to: '/opportunities',
     label: 'Pipeline',
     end: false,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="3" width="5" height="18" rx="1" />
-        <rect x="11" y="3" width="5" height="12" rx="1" />
-        <rect x="19" y="3" width="5" height="15" rx="1" />
-      </svg>
-    ),
+    icon: Kanban,
   },
   {
     to: '/network',
     label: 'Network & Companies',
     end: false,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
+    icon: Users,
   },
   {
     to: '/profile',
     label: 'Candidate Profile & Story Bank',
     end: false,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
-      </svg>
-    ),
+    icon: FileText,
   },
   {
     to: '/analytics',
     label: 'Analytics & Offers',
     end: false,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
-      </svg>
-    ),
+    icon: BarChart3,
   },
   {
     to: '/settings',
     label: 'Settings',
     end: false,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
+    icon: Settings,
   },
 ];
 
+function safeGetItem(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && typeof window.localStorage?.getItem === 'function') {
+      return window.localStorage.getItem(key);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && typeof window.localStorage?.setItem === 'function') {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function AppShell() {
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    return safeGetItem('cockpit-sidebar-collapsed') === 'true';
+  });
+  const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+
+  useEffect(() => {
+    safeSetItem('cockpit-sidebar-collapsed', String(collapsed));
+  }, [collapsed]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -92,15 +100,21 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  const currentNav = NAV_ITEMS.find((item) =>
+    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
+  );
+
   return (
-    <div className="cockpit-layout">
+    <div className={`cockpit-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="cockpit-sidebar">
         <div className="sidebar-brand">
           <span className="brand-badge">JSC</span>
-          <div>
-            <h1 className="brand-title">Job Search Cockpit</h1>
-            <p className="brand-subtitle">Local-First Career Command</p>
-          </div>
+          {!collapsed && (
+            <div className="brand-text">
+              <h1 className="brand-title">Job Search Cockpit</h1>
+              <p className="brand-subtitle">Career Command Center</p>
+            </div>
+          )}
         </div>
 
         <button
@@ -108,30 +122,94 @@ export function AppShell() {
           className="sidebar-quick-btn"
           onClick={() => setQuickCaptureOpen(true)}
           aria-label="Quick Capture"
+          title="Quick Capture (⌘K)"
         >
-          <span>+ Quick Capture</span>
-          <kbd className="sidebar-shortcut-badge">⌘K</kbd>
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4 text-sky-400 shrink-0" />
+            {!collapsed && <span>+ Quick Capture</span>}
+          </div>
+          {!collapsed && <kbd className="sidebar-shortcut-badge">⌘K</kbd>}
         </button>
 
         <nav className="sidebar-nav" aria-label="Workspace Navigation">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
-              }
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) =>
+                  `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+                }
+              >
+                <Icon className="sidebar-icon shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </NavLink>
+            );
+          })}
         </nav>
       </aside>
-      <main className="cockpit-main">
-        <Outlet />
-      </main>
+
+      <div className="cockpit-content-wrap">
+        <header className="cockpit-header">
+          <div className="header-left">
+            <button
+              type="button"
+              className="header-icon-btn"
+              onClick={() => setCollapsed((c) => !c)}
+              aria-label="Toggle sidebar collapse"
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="w-4 h-4" />
+              ) : (
+                <PanelLeftClose className="w-4 h-4" />
+              )}
+            </button>
+            <div className="header-breadcrumbs">
+              <span className="text-muted-foreground font-medium text-xs">Cockpit</span>
+              <span className="text-muted-foreground text-xs">/</span>
+              <span className="font-semibold text-sm text-foreground">
+                {currentNav?.label ?? 'Workspace'}
+              </span>
+            </div>
+          </div>
+
+          <div className="header-right">
+            <button
+              type="button"
+              className="header-search-trigger"
+              onClick={() => setQuickCaptureOpen(true)}
+              aria-label="Search opportunities (⌘K)"
+            >
+              <Search className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="search-placeholder">Quick capture or search...</span>
+              <kbd className="header-kbd">⌘K</kbd>
+            </button>
+
+            <button
+              type="button"
+              className="header-icon-btn"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-700" />
+              )}
+            </button>
+          </div>
+        </header>
+
+        <main className="cockpit-main">
+          <Outlet />
+        </main>
+      </div>
+
       {quickCaptureOpen && (
         <QuickCaptureModal onClose={() => setQuickCaptureOpen(false)} />
       )}

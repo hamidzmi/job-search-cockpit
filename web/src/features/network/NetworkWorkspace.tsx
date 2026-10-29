@@ -20,6 +20,8 @@ import { CompanyFormModal } from '../pipeline/CompanyFormModal';
 import { ActionItemModal } from './ActionItemModal';
 import { ContactFormModal } from './ContactFormModal';
 import { LogInteractionModal } from './LogInteractionModal';
+import { Button } from '../../components/ui/Button';
+import { Pencil } from 'lucide-react';
 
 type NetworkTab = 'contacts' | 'companies' | 'activity';
 
@@ -321,7 +323,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{contacts.length}</div>
             <div className="hud-label">Global Contacts</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#e0f2fe', color: '#0369a1' }}>
+          <div className="hud-icon-badge hud-badge-rounds">
             👥
           </div>
         </div>
@@ -331,7 +333,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{companies.length}</div>
             <div className="hud-label">Target Companies</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#f1f5f9', color: '#334155' }}>
+          <div className="hud-icon-badge hud-badge-stale">
             🏢
           </div>
         </div>
@@ -341,7 +343,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{openActionItems.length}</div>
             <div className="hud-label">Open Action Items</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#fef3c7', color: '#b45309' }}>
+          <div className="hud-icon-badge hud-badge-action">
             ⚡
           </div>
         </div>
@@ -351,7 +353,7 @@ export function NetworkWorkspace() {
             <div className="hud-value">{interactions.length}</div>
             <div className="hud-label">Logged Interactions</div>
           </div>
-          <div className="hud-icon-badge" style={{ background: '#ecfdf5', color: '#047857' }}>
+          <div className="hud-icon-badge hud-badge-success">
             💬
           </div>
         </div>
@@ -481,14 +483,16 @@ export function NetworkWorkspace() {
                           </div>
                         </div>
                       </div>
-                      <button
+                      <Button
                         type="button"
-                        className="btn-secondary"
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="Edit Contact"
+                        title="Edit Contact"
                         onClick={() => setEditingContact(contact)}
                       >
-                        Edit Contact
-                      </button>
+                        <Pencil className="size-3.5" />
+                      </Button>
                     </div>
 
                     {/* Zone 2: Meta Row (Email, LinkedIn, Notes) */}
@@ -679,13 +683,16 @@ export function NetworkWorkspace() {
                           )}
                         </div>
                       </div>
-                      <button
+                      <Button
                         type="button"
-                        className="btn-secondary"
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="Edit Company"
+                        title="Edit Company"
                         onClick={() => setEditingCompany(c)}
                       >
-                        Edit Company
-                      </button>
+                        <Pencil className="size-3.5" />
+                      </Button>
                     </div>
 
                     {c.headquarters && (
