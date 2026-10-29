@@ -382,11 +382,12 @@ export function OpportunityInterviewRounds({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.4rem',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
+                            background: 'var(--bg-subtle)',
+                            border: '1px solid var(--border)',
                             borderRadius: '0.45rem',
                             padding: '0.25rem 0.55rem',
                             fontSize: '0.82rem',
+                            color: 'var(--text-main)',
                           }}
                         >
                           <span>{st.title}</span>
@@ -465,9 +466,6 @@ export function OpportunityInterviewRounds({
         className="panel-card"
         style={{
           marginTop: '1.75rem',
-          background: '#ffffff',
-          borderRadius: '0.75rem',
-          border: '1px solid var(--border-subtle)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -610,10 +608,11 @@ export function OpportunityInterviewRounds({
                   gap: '0.35rem',
                   maxHeight: '140px',
                   overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   borderRadius: '0.45rem',
                   padding: '0.5rem',
-                  background: '#f8fafc',
+                  background: 'var(--bg-subtle)',
+                  color: 'var(--text-main)',
                 }}
               >
                 {allContacts.map((c) => (
@@ -643,10 +642,11 @@ export function OpportunityInterviewRounds({
                   gap: '0.4rem',
                   maxHeight: '140px',
                   overflowY: 'auto',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid var(--border)',
                   borderRadius: '0.45rem',
                   padding: '0.5rem',
-                  background: '#f8fafc',
+                  background: 'var(--bg-subtle)',
+                  color: 'var(--text-main)',
                 }}
               >
                 {allStories.map((st) => {
