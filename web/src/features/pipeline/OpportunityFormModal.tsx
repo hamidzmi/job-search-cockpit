@@ -17,6 +17,7 @@ import {
 interface OpportunityFormModalProps {
   companies: Company[];
   selectedCompanyId?: string;
+  initialStage?: Stage;
   onRequestNewCompany: () => void;
   onClose: () => void;
   onSubmit: (input: OpportunityCreateInput) => Promise<void>;
@@ -25,13 +26,14 @@ interface OpportunityFormModalProps {
 export function OpportunityFormModal({
   companies,
   selectedCompanyId,
+  initialStage,
   onRequestNewCompany,
   onClose,
   onSubmit,
 }: OpportunityFormModalProps) {
   const [companyId, setCompanyId] = useState(selectedCompanyId ?? companies[0]?.id ?? '');
   const [draft, setDraft] = useState(() => createEmptyDetailsDraft('High', 'Remote'));
-  const [stage, setStage] = useState<Stage>('Discovered');
+  const [stage, setStage] = useState<Stage>(initialStage ?? 'Discovered');
   const [transitionNote, setTransitionNote] = useState('');
   const [includeJobPosting, setIncludeJobPosting] = useState(false);
 

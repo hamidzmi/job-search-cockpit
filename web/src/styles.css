@@ -566,13 +566,12 @@ body {
 
 /* Kanban Board Layout */
 .kanban-board {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(240px, 1fr));
-  gap: 1rem;
-  align-items: start;
+  width: 100%;
+  overflow-x: auto;
 }
 
 .kanban-column {
+  min-width: 285px;
   background: var(--bg-canvas);
   border: 1px solid var(--border);
   border-radius: 0.75rem;

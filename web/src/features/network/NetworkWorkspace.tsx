@@ -20,6 +20,8 @@ import { CompanyFormModal } from '../pipeline/CompanyFormModal';
 import { ActionItemModal } from './ActionItemModal';
 import { ContactFormModal } from './ContactFormModal';
 import { LogInteractionModal } from './LogInteractionModal';
+import { Button } from '../../components/ui/Button';
+import { Pencil } from 'lucide-react';
 
 type NetworkTab = 'contacts' | 'companies' | 'activity';
 
@@ -481,14 +483,16 @@ export function NetworkWorkspace() {
                           </div>
                         </div>
                       </div>
-                      <button
+                      <Button
                         type="button"
-                        className="btn-secondary"
-                        style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="Edit Contact"
+                        title="Edit Contact"
                         onClick={() => setEditingContact(contact)}
                       >
-                        Edit Contact
-                      </button>
+                        <Pencil className="size-3.5" />
+                      </Button>
                     </div>
 
                     {/* Zone 2: Meta Row (Email, LinkedIn, Notes) */}
@@ -679,13 +683,16 @@ export function NetworkWorkspace() {
                           )}
                         </div>
                       </div>
-                      <button
+                      <Button
                         type="button"
-                        className="btn-secondary"
+                        variant="outline"
+                        size="icon-xs"
+                        aria-label="Edit Company"
+                        title="Edit Company"
                         onClick={() => setEditingCompany(c)}
                       >
-                        Edit Company
-                      </button>
+                        <Pencil className="size-3.5" />
+                      </Button>
                     </div>
 
                     {c.headquarters && (

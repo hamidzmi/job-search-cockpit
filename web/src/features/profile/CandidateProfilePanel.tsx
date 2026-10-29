@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useCockpitApi } from '../../api/CockpitApiContext';
 import type { CandidateProfile, CandidateProfileUpsertInput } from '../../api/types';
 import { formatLocalDateTime } from '../../lib/date';
+import { Button } from '../../components/ui/Button';
+import { Trash2 } from 'lucide-react';
 
 interface WorkHistoryFormItem {
   company: string;
@@ -328,13 +330,17 @@ export function CandidateProfilePanel() {
                       Role #{idx + 1}: {entry.title || 'Untitled Role'}{' '}
                       {entry.company ? `@ ${entry.company}` : ''}
                     </strong>
-                    <button
+                    <Button
                       type="button"
-                      className="btn-ghost"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Remove Entry"
+                      title="Remove Entry"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemoveEntry(idx)}
                     >
-                      Remove Entry
-                    </button>
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
                   <div className="form-grid">
                     <label className="form-field">
